@@ -184,7 +184,7 @@ class MainActivity : Activity() {
         topStatus.text = "وضعیت: در حال راه‌اندازی Psiphon…"
         PsiphonAutoConnector.connect(this) { message ->
             if (::topStatus.isInitialized) topStatus.text = "وضعیت: $message"
-            if (message.startsWith("خطای Psiphon:")) toast(message)
+            if (message.startsWith("خطای Psiphon:")) Toast.makeText(this, message, Toast.LENGTH_LONG).show()
         }
     }
 
@@ -402,7 +402,7 @@ class MainActivity : Activity() {
             .getButton(AlertDialog.BUTTON_NEUTRAL)?.setOnClickListener {
                 val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
                 clipboard.setPrimaryClip(android.content.ClipData.newPlainText("AzadLink logs", logs))
-                toast("گزارش کپی شد.")
+                Toast.makeText(this, "گزارش کپی شد.", Toast.LENGTH_LONG).show()
             }
     }
 
@@ -444,7 +444,7 @@ class MainActivity : Activity() {
                     panel.addView(space(8))
                     panel.addView(button("بستن و افزودن پروفایل") {
                         profileInput.requestFocus()
-                        toast("پروفایل را در بخش افزودن پروفایل وارد کن.")
+                        Toast.makeText(this, "پروفایل را در بخش افزودن پروفایل وارد کن.", Toast.LENGTH_LONG).show()
                     })
                 } else {
                     matching.forEach { profile ->
