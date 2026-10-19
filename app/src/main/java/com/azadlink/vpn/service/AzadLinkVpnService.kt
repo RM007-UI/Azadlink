@@ -84,7 +84,8 @@ class AzadLinkVpnService : VpnService(), CoreCallbackHandler {
             val startError = controller.startLoop(config, tun.fd)
             if (startError != null) throw IllegalStateException(startError.message ?: "خطای راه‌اندازی Xray")
             check(controller.isRunning) { "هستهٔ Xray اجرا نشد" }
-            publishStatus("درخواست اتصال به موتور ارسال شد؛ در حال بررسی تونل")
+            publishStatus("موتور اجرا شد؛ در حال آزمون عبور ترافیک…")
+            verifyTrafficThroughTunnel()
         } catch (error: Throwable) {
             stopTunnel("خطای اتصال: ${error.message ?: error.javaClass.simpleName}")
         }
@@ -117,8 +118,32 @@ class AzadLinkVpnService : VpnService(), CoreCallbackHandler {
     override fun shutdown(): Long = 0
 
     override fun onEmitStatus(code: Long, message: String?): Long {
-        message?.takeIf { it.isNotBlank() }?.let { publishStatus("Xray: $it") }
+        val value = message?.trim().orEmpty()
+        if (value.contains("error", true) || value.contains("failed", true)) {
+            publishStatus("خطای Xray: $value")
+        }
         return 0
+    }
+
+    private fun verifyTrafficThroughTunnel() {
+        try {
+            val connection = (java.net.URL("https://www.cloudflare.com/cdn-cgi/trace").openConnection()
+                as javax.net.ssl.HttpsURLConnection).apply {
+                connectTimeout = 12_000
+                readTimeout = 12_000
+                instanceFollowRedirects = true
+                requestMethod = "GET"
+            }
+            val code = try {
+                connection.responseCode
+            } finally {
+                connection.disconnect()
+            }
+            if (code !in 200..399) throw IllegalStateException("آزمون اینترنت پاسخ HTTP $code داد")
+            publishStatus("متصل · عبور ترافیک از تونل تأیید شد")
+        } catch (error: Throwable) {
+            stopTunnel("اتصال تونل تأیید نشد: ${error.message ?: "آزمون اینترنت ناموفق بود"}")
+        }
     }
 
     override fun onRevoke() {
