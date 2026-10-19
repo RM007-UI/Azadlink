@@ -34,6 +34,13 @@ jobs:
           test -f oblivion-upstream/android/aether-vpn/src/main/kotlin/org/bepass/oblivion/vpn/AetherVpnService.kt
           test -f oblivion-upstream/android/aether-vpn/src/main/kotlin/org/bepass/oblivion/vpn/TunnelBundle.kt
           test -f oblivion-upstream/aetherproject/aether/Cargo.toml
+      - name: Keep Psiphon startup diagnostics visible in device logs
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The upstream core logs unstructured ConsoleClient stderr at debug level.
+          # Android builds run at info level, which hides the actual early-exit reason.
+          sed -i 's/log::debug!("\[psiphon\] {line}");/log::warn!("[psiphon] {line}");/g' oblivion-upstream/aetherproject/aether/src/psiphon.rs
           test -f oblivion-upstream/android/aether-vpn/src/main/jni/hev-socks5-tunnel/Android.mk
           echo "Pinned upstream Aether, Rust core, and hev TUN bridge sources are present."
       - name: Preserve upstream license notices
