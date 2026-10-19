@@ -181,7 +181,7 @@ class AzadLinkVpnService : VpnService(), CoreCallbackHandler {
             Notification.Builder(this)
         }
         return builder
-            .setSmallIcon(android.R.drawable.stat_sys_vpn_ic)
+            .setSmallIcon(android.R.drawable.stat_sys_warning)
             .setContentTitle("AzadLink · $currentLabel")
             .setContentText(message)
             .setOngoing(true)
