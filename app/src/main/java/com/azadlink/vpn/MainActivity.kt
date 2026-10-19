@@ -289,6 +289,11 @@ class MainActivity : Activity() {
             background = rounded(Color.rgb(37, 43, 65), 14)
             minHeight = dp(44)
         })
+        hero.addView(space(7))
+        hero.addView(button("مسیریابی برنامه‌ها و پروکسی") { showRoutingSettings() }.apply {
+            background = rounded(Color.rgb(37, 48, 70), 14)
+            minHeight = dp(44)
+        })
         content.addView(hero)
         content.addView(space(22))
 
@@ -461,6 +466,97 @@ class MainActivity : Activity() {
                 clipboard.setPrimaryClip(android.content.ClipData.newPlainText("AzadLink logs", logs))
                 Toast.makeText(this, "گزارش کپی شد.", Toast.LENGTH_LONG).show()
             }
+    }
+
+    private fun showRoutingSettings() {
+        val prefs = getSharedPreferences("azadlink_routing", MODE_PRIVATE)
+        val currentMode = prefs.getString("split_mode", "disabled") ?: "disabled"
+        val selected = prefs.getStringSet("selected_apps", emptySet())?.toMutableSet() ?: mutableSetOf()
+        val panel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(18), dp(8), dp(18), dp(8))
+        }
+        panel.addView(text("انتخاب کن کدام برنامه‌ها از تونل عبور کنند.", 14, Color.WHITE, true))
+        panel.addView(space(8))
+        val modeGroup = android.widget.RadioGroup(this).apply { orientation = android.widget.RadioGroup.VERTICAL }
+        val modeOptions = listOf(
+            "disabled" to "همهٔ برنامه‌ها از تونل عبور کنند",
+            "bypassSelected" to "همه به‌جز برنامه‌های انتخاب‌شده",
+            "onlySelected" to "فقط برنامه‌های انتخاب‌شده"
+        )
+        val radios = modeOptions.map { (value, label) ->
+            android.widget.RadioButton(this).apply {
+                text = label
+                tag = value
+                textSize = 13f
+                setTextColor(Color.WHITE)
+                isChecked = currentMode == value
+                modeGroup.addView(this)
+            }
+        }
+        panel.addView(modeGroup)
+        panel.addView(space(8))
+        val proxyOnly = android.widget.CheckBox(this).apply {
+            text = "حالت فقط پراکسی (بدون مسیریابی سراسری)"
+            textSize = 13f
+            setTextColor(Color.WHITE)
+            isChecked = prefs.getBoolean("proxy_only", false)
+        }
+        panel.addView(proxyOnly)
+        panel.addView(text(
+            "توجه: حالت فقط پراکسی فعلاً در موتور Aether/Psiphon پشتیبانی می‌شود؛ پروتکل‌های Xray در حالت VPN کار می‌کنند. در حالت پراکسی، برنامه‌ها باید دستی به پراکسی محلی وصل شوند.",
+            11, Color.rgb(255, 205, 115)
+        ))
+        panel.addView(space(10))
+        panel.addView(text("برنامه‌ها", 15, Color.rgb(207, 199, 255), true))
+        panel.addView(space(5))
+
+        val launcherIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+        val apps = packageManager.queryIntentActivities(launcherIntent, 0)
+            .mapNotNull { info ->
+                val appInfo = info.activityInfo?.applicationInfo ?: return@mapNotNull null
+                if (appInfo.packageName == packageName) return@mapNotNull null
+                val label = runCatching { packageManager.getApplicationLabel(appInfo).toString() }
+                    .getOrDefault(appInfo.packageName)
+                Triple(label, appInfo.packageName, info.loadIcon(packageManager))
+            }
+            .distinctBy { it.second }
+            .sortedBy { it.first.lowercase() }
+        val appChecks = mutableMapOf<String, android.widget.CheckBox>()
+        val appList = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        apps.forEach { (label, pkg, icon) ->
+            val check = android.widget.CheckBox(this).apply {
+                text = "$label  ·  $pkg"
+                textSize = 12f
+                setTextColor(Color.WHITE)
+                isChecked = selected.contains(pkg)
+                buttonTintList = android.content.res.ColorStateList.valueOf(Color.rgb(132, 103, 255))
+                setCompoundDrawablesWithIntrinsicBounds(icon, null, null, null)
+                compoundDrawablePadding = dp(8)
+            }
+            appChecks[pkg] = check
+            appList.addView(check)
+        }
+        val appScroll = ScrollView(this).apply {
+            addView(appList)
+            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(240))
+        }
+        panel.addView(appScroll)
+        AlertDialog.Builder(this)
+            .setTitle("مسیریابی و حالت پراکسی")
+            .setView(ScrollView(this).apply { addView(panel) })
+            .setNegativeButton("لغو", null)
+            .setPositiveButton("ذخیره") { _, _ ->
+                val mode = radios.firstOrNull { it.isChecked }?.tag as? String ?: "disabled"
+                val chosen = appChecks.filterValues { it.isChecked }.keys
+                prefs.edit()
+                    .putString("split_mode", mode)
+                    .putStringSet("selected_apps", chosen.toSet())
+                    .putBoolean("proxy_only", proxyOnly.isChecked)
+                    .apply()
+                Toast.makeText(this, "تنظیمات ذخیره شد؛ اتصال را قطع و دوباره برقرار کن.", Toast.LENGTH_LONG).show()
+            }
+            .show()
     }
 
     private fun showMasqueAdvancedSettings() {
