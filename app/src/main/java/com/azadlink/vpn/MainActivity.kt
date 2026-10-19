@@ -292,19 +292,30 @@ class MainActivity : Activity() {
         content.addView(hero)
         content.addView(space(22))
 
-        content.addView(text("پروتکل‌ها", 20, Color.WHITE, true))
-        content.addView(space(3))
-        content.addView(text("هر کارت بخش مستقل تنظیمات و وضعیت خودش را دارد.", 12, muted))
-        content.addView(space(11))
-
         val groups = listOf(
-            "اتصال خودکار" to listOf(Protocol.MASQUE, Protocol.PSIPHON),
             "پروتکل‌های سروری" to listOf(Protocol.VLESS, Protocol.VMESS, Protocol.TROJAN, Protocol.SHADOWSOCKS, Protocol.WIREGUARD),
-            "تونل‌های DNS" to listOf(Protocol.MASTER_DNS, Protocol.STORM_DNS, Protocol.DNSTT)
+            "تونل‌های DNS" to listOf(Protocol.MASTER_DNS, Protocol.STORM_DNS, Protocol.DNSTT),
+            "Aether و MASQUE" to listOf(Protocol.MASQUE),
+            "اتصال مستقیم" to listOf(Protocol.PSIPHON)
         )
-        groups.forEach { (heading, items) ->
-            content.addView(text(heading, 15, Color.rgb(207, 199, 255), true))
-            content.addView(space(7))
+        val tabSections = mutableListOf<LinearLayout>()
+        groups.forEachIndexed { tabIndex, (heading, items) ->
+            val section = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(0, dp(5), 0, dp(5))
+                visibility = if (tabIndex == 0) View.VISIBLE else View.GONE
+            }
+            section.addView(text(heading, 18, Color.rgb(207, 199, 255), true))
+            section.addView(space(7))
+            section.addView(text(
+                when (tabIndex) {
+                    0 -> "پروفایل سرورت را انتخاب کن یا کانفیگ جدید اضافه کن."
+                    1 -> "تونل‌های مبتنی بر DNS؛ برای اتصال واقعی به تنظیمات سرور نیاز دارند."
+                    2 -> "اتصال خودکار MASQUE با تنظیمات پیشرفته."
+                    else -> "اجرای مستقیم Psiphon؛ بدون واردکردن فایل کانفیگ توسط کاربر."
+                }, 12, muted
+            ))
+            section.addView(space(10))
             items.forEach { protocol ->
                 val engine = EngineRegistry.forProtocol(protocol)
                 val card = LinearLayout(this).apply {
@@ -346,15 +357,21 @@ class MainActivity : Activity() {
                 card.addView(text("›", 24, muted, true))
                 val params = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
                 params.bottomMargin = dp(7)
-                content.addView(card, params)
+                section.addView(card, params)
             }
+            content.addView(section)
             content.addView(space(8))
+            tabSections.add(section)
         }
 
-        content.addView(space(4))
-        content.addView(text("افزودن پروفایل", 19, Color.WHITE, true))
-        content.addView(space(4))
-        content.addView(text("برای VLESS، VMess، Trojan، Shadowsocks و WireGuard", 12, muted))
+        val profileSection = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(0, dp(6), 0, dp(6))
+        }
+        profileSection.addView(space(4))
+        profileSection.addView(text("افزودن پروفایل", 19, Color.WHITE, true))
+        profileSection.addView(space(4))
+        profileSection.addView(text("برای VLESS، VMess، Trojan، Shadowsocks و WireGuard", 12, muted))
         profileInput = EditText(this).apply {
             hint = "vless://… یا [Interface]…"
             setHintTextColor(Color.rgb(111, 123, 149))
@@ -366,19 +383,59 @@ class MainActivity : Activity() {
             setPadding(dp(14), dp(13), dp(14), dp(13))
             background = rounded(panel, 16)
         }
-        content.addView(space(9))
-        content.addView(profileInput, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
-        content.addView(space(9))
-        content.addView(button("تشخیص و افزودن پروفایل") { importProfiles() }.apply {
+        profileSection.addView(space(9))
+        profileSection.addView(profileInput, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        profileSection.addView(space(9))
+        profileSection.addView(button("تشخیص و افزودن پروفایل") { importProfiles() }.apply {
             background = rounded(accent, 15)
             minHeight = dp(48)
         })
-        content.addView(space(17))
-        content.addView(text("پروفایل‌های این نشست", 19, Color.WHITE, true))
-        content.addView(space(8))
+        profileSection.addView(space(17))
+        profileSection.addView(text("پروفایل‌های این نشست", 19, Color.WHITE, true))
+        profileSection.addView(space(8))
         profileList = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        content.addView(profileList)
+        profileSection.addView(profileList)
+        tabSections[0].addView(profileSection)
+
+        val bottomBar = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            setPadding(dp(6), dp(7), dp(6), dp(7))
+            background = rounded(Color.rgb(17, 22, 37), 20)
+        }
+        val tabLabels = listOf("سرورها", "DNS", "Aether", "Psiphon")
+        val tabButtons = mutableListOf<TextView>()
+        fun selectTab(index: Int) {
+            tabSections.forEachIndexed { i, section -> section.visibility = if (i == index) View.VISIBLE else View.GONE }
+            tabButtons.forEachIndexed { i, button ->
+                button.setTextColor(if (i == index) Color.WHITE else muted)
+                button.background = rounded(if (i == index) Color.rgb(73, 58, 126) else Color.TRANSPARENT, 14)
+                button.animate().scaleX(if (i == index) 1.03f else 1f).scaleY(if (i == index) 1.03f else 1f).setDuration(150).start()
+            }
+            content.animate().alpha(0.72f).setDuration(80).withEndAction {
+                content.alpha = 1f
+            }.start()
+        }
+        tabLabels.forEachIndexed { index, label ->
+            val tabButton = TextView(this).apply {
+                text = label
+                textSize = 12f
+                gravity = Gravity.CENTER
+                setPadding(dp(5), dp(12), dp(5), dp(12))
+                setTextColor(if (index == 0) Color.WHITE else muted)
+                background = rounded(if (index == 0) Color.rgb(73, 58, 126) else Color.TRANSPARENT, 14)
+                isClickable = true
+                isFocusable = true
+                setOnClickListener { selectTab(index) }
+                layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+            }
+            tabButtons.add(tabButton)
+            bottomBar.addView(tabButton)
+        }
         root.addView(scroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+        val navParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+        navParams.setMargins(dp(10), dp(4), dp(10), dp(7))
+        root.addView(bottomBar, navParams)
         setContentView(root)
         renderProfiles()
     }
