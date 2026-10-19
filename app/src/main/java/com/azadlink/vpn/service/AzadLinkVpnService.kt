@@ -157,7 +157,7 @@ class AzadLinkVpnService : VpnService(), CoreCallbackHandler {
     }
 
     override fun onDestroy() {
-        worker.execute { stopTunnel("سرویس متوقف شد") }
+        worker.execute { releaseTunnel() }
         worker.shutdown()
         super.onDestroy()
     }
