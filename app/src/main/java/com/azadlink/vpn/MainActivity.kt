@@ -210,6 +210,10 @@ class MainActivity : Activity() {
 
     private fun disconnectVpn() {
         AetherAutoConnector.disconnect(this)
+        val stopIntent = Intent(this, AzadLinkVpnService::class.java).apply {
+            action = AzadLinkVpnService.ACTION_DISCONNECT
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(stopIntent) else startService(stopIntent)
         topStatus.text = "وضعیت: درخواست قطع اتصال ارسال شد"
     }
     private fun buildUi() {
