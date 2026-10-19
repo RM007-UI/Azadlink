@@ -34,7 +34,7 @@ object AetherAutoConnector {
 
                 val workDir = File(appContext.filesDir, "aether").apply { mkdirs() }
                 val masqueIdentity = File(workDir, "aether-masque.toml")
-                val environment = mapOf(
+                val envVars = mapOf(
                     "HOME" to workDir.absolutePath,
                     "TMPDIR" to appContext.cacheDir.absolutePath,
                     "SSL_CERT_DIR" to "/apex/com.android.conscrypt/cacerts:/system/etc/security/cacerts",
@@ -53,7 +53,7 @@ object AetherAutoConnector {
                         "--log-level", "info",
                         "--ip", "both"
                     ).directory(workDir).redirectErrorStream(true).redirectOutput(registrationLog).apply {
-                        environment().putAll(environment)
+                        environment().putAll(envVars)
                     }.start()
 
                     if (!process.waitFor(REGISTER_TIMEOUT_MINUTES, TimeUnit.MINUTES)) {
