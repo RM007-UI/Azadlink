@@ -8,7 +8,6 @@ import org.bepass.oblivion.vpn.AetherVpnService
 import org.bepass.oblivion.vpn.TunnelConfig
 import org.bepass.oblivion.vpn.TunnelBus
 import org.bepass.oblivion.vpn.TunnelStage
-import java.util.concurrent.atomic.AtomicBoolean
 import java.io.File
 import java.util.concurrent.TimeUnit
 
@@ -79,17 +78,18 @@ object AetherAutoConnector {
                     "--ip", "both",
                     "--validate-secs", "10",
                     "--reconnect-secs", "2",
-                    "--noize", "balanced",
+                    "--noize", "firewall",
                     "--masque",
-                    "--masque-sni", "www.cloudflare.com"
+                    "--masque-sni", "www.cloudflare.com",
+                    "--h2"
                 )
                 val settings = mapOf<String, Any?>(
                     "protocol" to "masque",
-                    "modeLabel" to "MASQUE H3",
-                    "transport" to "h3",
+                    "modeLabel" to "MASQUE H2",
+                    "transport" to "h2",
                     "scanMode" to "balanced",
-                    "obfuscation" to "balanced",
-                    "noizeProfile" to "balanced",
+                    "obfuscation" to "firewall",
+                    "noizeProfile" to "firewall",
                     "ipVersion" to "both",
                     "logLevel" to "info",
                     "endpoint" to "",
@@ -104,45 +104,16 @@ object AetherAutoConnector {
                     "splitTunnelMode" to "disabled",
                     "bypassedApps" to emptyList<String>()
                 )
-                val fallbackScheduled = AtomicBoolean(false)
-                val fallbackStarted = AtomicBoolean(false)
-                val sawConnecting = AtomicBoolean(false)
                 lateinit var statusListener: (org.bepass.oblivion.vpn.TunnelSnapshot) -> Unit
                 statusListener = { snapshot ->
                     when (snapshot.stage) {
-                        TunnelStage.CONNECTING -> {
-                            sawConnecting.set(true)
-                            if (fallbackScheduled.get()) fallbackStarted.set(true)
-                        }
                         TunnelStage.CONNECTED -> {
                             TunnelBus.removeStatusListener(statusListener)
-                            onStatusOnMain(onStatus, "تونل MASQUE برقرار شد.")
+                            onStatusOnMain(onStatus, "تونل MASQUE با HTTP/2 برقرار شد.")
                         }
                         TunnelStage.FAILED -> {
-                            if (sawConnecting.get() && fallbackScheduled.compareAndSet(false, true)) {
-                                sawConnecting.set(false)
-                                onStatusOnMain(onStatus, "MASQUE روی HTTP/3 در این شبکه درگاه سالم پیدا نکرد؛ تلاش جایگزین با HTTP/2 و obfuscation قوی‌تر…")
-                                mainHandler.postDelayed({
-                                    AetherVpnService.stop(appContext)
-                                    mainHandler.postDelayed({
-                                        val fallbackArguments = arguments.toMutableList().apply {
-                                            val noizeIndex = indexOf("--noize")
-                                            if (noizeIndex >= 0 && noizeIndex + 1 < size) this[noizeIndex + 1] = "firewall"
-                                            add("--h2")
-                                        }
-                                        val fallbackSettings = settings + mapOf(
-                                            "modeLabel" to "MASQUE H2 fallback",
-                                            "transport" to "h2",
-                                            "obfuscation" to "firewall",
-                                            "noizeProfile" to "firewall"
-                                        )
-                                        AetherVpnService.start(appContext, TunnelConfig.fromMap(fallbackSettings, fallbackArguments))
-                                    }, 1400L)
-                                }, 500L)
-                            } else if (fallbackStarted.get()) {
-                                TunnelBus.removeStatusListener(statusListener)
-                                onStatusOnMain(onStatus, "اتصال MASQUE ناموفق ماند؛ HTTP/3 و تلاش جایگزین HTTP/2 هر دو در این شبکه شکست خوردند.")
-                            }
+                            TunnelBus.removeStatusListener(statusListener)
+                            onStatusOnMain(onStatus, "اتصال MASQUE با HTTP/2 ناموفق بود؛ گزارش اتصال را برای بررسی خطای موتور باز کن.")
                         }
                         else -> Unit
                     }
