@@ -463,6 +463,81 @@ class MainActivity : Activity() {
             }
     }
 
+    private fun showMasqueAdvancedSettings() {
+        val prefs = getSharedPreferences("azadlink_masque", MODE_PRIVATE)
+        val panel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(10), dp(20), dp(8))
+        }
+        fun addLabel(value: String) {
+            panel.addView(text(value, 13, Color.rgb(186, 196, 218), true))
+            panel.addView(space(4))
+        }
+        fun spinner(items: List<String>, selected: Int): android.widget.Spinner {
+            return android.widget.Spinner(this).apply {
+                adapter = android.widget.ArrayAdapter(
+                    this@MainActivity,
+                    android.R.layout.simple_spinner_dropdown_item,
+                    items
+                )
+                setSelection(selected)
+            }
+        }
+        addLabel("انتقال")
+        val transportSpinner = spinner(
+            listOf("HTTP/2 · پیشنهادشده برای شبکهٔ من", "حالت پیش‌فرض موتور"),
+            if ((prefs.getString("transport", "h2") ?: "h2") == "h2") 0 else 1
+        )
+        panel.addView(transportSpinner)
+        panel.addView(space(10))
+        addLabel("الگوی عبور از محدودیت")
+        val noiseSpinner = spinner(
+            listOf("firewall", "balanced"),
+            if ((prefs.getString("obfuscation", "firewall") ?: "firewall") == "firewall") 0 else 1
+        )
+        panel.addView(noiseSpinner)
+        panel.addView(space(10))
+        addLabel("نسخهٔ IP")
+        val ipSpinner = spinner(
+            listOf("دوگانه · IPv4 + IPv6", "فقط IPv4", "فقط IPv6"),
+            when (prefs.getString("ip_version", "both")) { "v4" -> 1; "v6" -> 2; else -> 0 }
+        )
+        panel.addView(ipSpinner)
+        panel.addView(space(10))
+        addLabel("نام سرور TLS (SNI)")
+        val sniInput = EditText(this).apply {
+            setSingleLine(true)
+            setText(prefs.getString("sni", "www.cloudflare.com") ?: "www.cloudflare.com")
+            setTextColor(Color.WHITE)
+            setHintTextColor(Color.rgb(111, 123, 149))
+            hint = "www.cloudflare.com"
+            textSize = 14f
+            setPadding(dp(12), dp(10), dp(12), dp(10))
+            background = rounded(Color.rgb(23, 29, 48), 12)
+        }
+        panel.addView(sniInput)
+        panel.addView(space(8))
+        panel.addView(text(
+            "تنظیمات پس از ذخیره‌شدن روی اتصال بعدی اعمال می‌شوند. موفقیت اتصال به شبکه و درگاه قابل‌دسترسی هم بستگی دارد.",
+            12, Color.rgb(159, 171, 197)
+        ))
+        AlertDialog.Builder(this)
+            .setTitle("تنظیمات پیشرفتهٔ MASQUE")
+            .setView(panel)
+            .setNegativeButton("لغو", null)
+            .setPositiveButton("ذخیره") { _, _ ->
+                val ip = when (ipSpinner.selectedItemPosition) { 1 -> "v4"; 2 -> "v6"; else -> "both" }
+                prefs.edit()
+                    .putString("transport", if (transportSpinner.selectedItemPosition == 0) "h2" else "default")
+                    .putString("obfuscation", if (noiseSpinner.selectedItemPosition == 0) "firewall" else "balanced")
+                    .putString("ip_version", ip)
+                    .putString("sni", sniInput.text?.toString()?.trim()?.takeIf { it.isNotBlank() } ?: "www.cloudflare.com")
+                    .apply()
+                Toast.makeText(this, "تنظیمات MASQUE ذخیره شد؛ برای اعمال، دوباره وصل شو.", Toast.LENGTH_LONG).show()
+            }
+            .show()
+    }
+
     private fun showProtocolDetail(protocol: Protocol) {
         val engine = EngineRegistry.forProtocol(protocol)
         val panel = LinearLayout(this).apply {
@@ -483,6 +558,10 @@ class MainActivity : Activity() {
             Protocol.MASQUE -> {
                 panel.addView(button("اتصال خودکار") { requestAutoConnect() }.apply {
                     background = rounded(Color.rgb(132, 103, 255), 14)
+                })
+                panel.addView(space(7))
+                panel.addView(button("تنظیمات پیشرفتهٔ MASQUE") { showMasqueAdvancedSettings() }.apply {
+                    background = rounded(Color.rgb(37, 48, 70), 14)
                 })
                 panel.addView(space(7))
                 panel.addView(button("قطع اتصال") { disconnectVpn() })
