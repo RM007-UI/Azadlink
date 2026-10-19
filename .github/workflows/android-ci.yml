@@ -20,6 +20,13 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+      - name: Adapt upstream library to the stable Android SDK in CI
+        shell: bash
+        run: |
+          # The pinned upstream currently declares preview API 37. AzadLink only
+          # needs stable API 35 for this integration, so patch the checked-out
+          # submodule build script in the ephemeral CI workspace only.
+          sed -i 's/compileSdk = 37/compileSdk = 35/; /compileSdkMinor = 0/d' oblivion-upstream/android/aether-vpn/build.gradle.kts
       - name: Verify pinned Aether and TUN bridge sources are present
         shell: bash
         run: |
@@ -51,7 +58,7 @@ jobs:
       - name: Install build prerequisites
         run: sudo apt-get update && sudo apt-get install -y jq
       - name: Install Android platform and NDK
-        run: yes | sdkmanager --licenses >/dev/null; sdkmanager 'platforms;android-35' 'platforms;android-37' 'build-tools;36.0.0' 'ndk;29.0.13846066'
+        run: yes | sdkmanager --licenses >/dev/null; sdkmanager 'platforms;android-35' 'build-tools;36.0.0' 'ndk;29.0.13846066'
       - name: Configure Android NDK
         run: |
           echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/29.0.13846066" >> "$GITHUB_ENV"
