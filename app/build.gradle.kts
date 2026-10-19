@@ -10,8 +10,8 @@ android {
         applicationId = "com.azadlink.vpn"
         minSdk = 26
         targetSdk = 35
-        versionCode = 3
-        versionName = "0.3.0-alpha"
+        versionCode = 4
+        versionName = "0.4.0-alpha"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     compileOptions {
@@ -23,6 +23,7 @@ android {
     packaging { jniLibs.useLegacyPackaging = true }
 }
 dependencies {
+    implementation(project(":aether-vpn"))
     implementation("com.google.code.gson:gson:2.11.0")
     val coreAar = file("libs/libv2ray.aar")
     if (coreAar.exists()) implementation(files(coreAar))
