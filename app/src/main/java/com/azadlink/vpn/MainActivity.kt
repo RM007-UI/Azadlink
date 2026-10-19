@@ -399,7 +399,7 @@ class MainActivity : Activity() {
                 panel.addView(button("قطع اتصال") { disconnectVpn() })
             }
             Protocol.PSIPHON -> {
-                panel.addView(text("این بخش برای اتصال مستقیم طراحی می‌شود و نباید از کاربر فایل JSON بخواهد. در بیلد فعلی، موتور رسمی هنوز به سرویس VPN وصل نشده است.", 12, Color.rgb(255, 198, 111)))
+                panel.addView(text("اتصال مستقیم با موتور Psiphon بسته‌بندی‌شده؛ بدون فایل JSON یا کانفیگ دستی. نتیجه فقط پس از گزارش وضعیت تونل مشخص می‌شود.", 12, Color.rgb(215, 208, 245)))
                 panel.addView(space(9))
                 panel.addView(button("اتصال مستقیم Psiphon") { requestPsiphonAutoConnect() }.apply {
                     background = rounded(Color.rgb(132, 103, 255), 14)
