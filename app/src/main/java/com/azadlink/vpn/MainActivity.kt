@@ -80,8 +80,8 @@ class MainActivity : Activity() {
             else { @Suppress("DEPRECATION") registerReceiver(statusReceiver, filter) }
             receiverRegistered = true
         }
-        TunnelBus.addStatusListener(tunnelStatusListener)
         refreshState()
+        TunnelBus.addStatusListener(tunnelStatusListener)
     }
     override fun onStop() {
         TunnelBus.removeStatusListener(tunnelStatusListener)
