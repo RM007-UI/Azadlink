@@ -52,7 +52,7 @@ class AzadLinkVpnService : VpnService(), CoreCallbackHandler {
     }
 
     private fun startTunnel(raw: String, protocolName: String) {
-        stopTunnel("در حال جایگزینی اتصال قبلی")
+        releaseTunnel()
         try {
             val protocol = runCatching { Protocol.valueOf(protocolName) }
                 .getOrElse { throw IllegalArgumentException("پروتکل ناشناخته است: $protocolName") }
@@ -81,7 +81,8 @@ class AzadLinkVpnService : VpnService(), CoreCallbackHandler {
             val controller = Libv2ray.newCoreController(this)
             coreController = controller
             publishStatus("در حال راه‌اندازی موتور Xray…")
-            controller.startLoop(config, tun.fd)
+            val startError = controller.startLoop(config, tun.fd)
+            if (startError != null) throw IllegalStateException(startError.message ?: "خطای راه‌اندازی Xray")
             check(controller.isRunning) { "هستهٔ Xray اجرا نشد" }
             publishStatus("درخواست اتصال به موتور ارسال شد؛ در حال بررسی تونل")
         } catch (error: Throwable) {
@@ -89,11 +90,15 @@ class AzadLinkVpnService : VpnService(), CoreCallbackHandler {
         }
     }
 
-    private fun stopTunnel(message: String) {
+    private fun releaseTunnel() {
         runCatching { coreController?.stopLoop() }
         coreController = null
         runCatching { vpnInterface?.close() }
         vpnInterface = null
+    }
+
+    private fun stopTunnel(message: String) {
+        releaseTunnel()
         publishStatus(message)
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
