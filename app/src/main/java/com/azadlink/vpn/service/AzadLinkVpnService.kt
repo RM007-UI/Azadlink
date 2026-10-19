@@ -64,7 +64,10 @@ class AzadLinkVpnService : VpnService(), CoreCallbackHandler {
             val config = CoreConfigBuilder.build(profile)
 
             publishStatus("در حال ایجاد رابط VPN…")
-            val tun = Builder()
+            val routingPrefs = getSharedPreferences("azadlink_routing", MODE_PRIVATE)
+            val splitMode = routingPrefs.getString("split_mode", "disabled") ?: "disabled"
+            val selectedApps = routingPrefs.getStringSet("selected_apps", emptySet())?.toList() ?: emptyList()
+            val builder = Builder()
                 .setSession("AzadLink · $currentLabel")
                 .setMtu(1500)
                 .addAddress("10.0.0.2", 30)
@@ -73,8 +76,30 @@ class AzadLinkVpnService : VpnService(), CoreCallbackHandler {
                 .addAddress("fd00:1:fd00:1::2", 126)
                 .addRoute("::", 0)
                 .addDnsServer("2606:4700:4700::1111")
-                .addDisallowedApplication(packageName)
-                .establish() ?: throw IllegalStateException("Android رابط VPN را ایجاد نکرد")
+            if (splitMode == "onlySelected") {
+                var allowedCount = 0
+                selectedApps.filter { it != packageName }.forEach { app ->
+                    try {
+                        builder.addAllowedApplication(app)
+                        allowedCount++
+                    } catch (_: android.content.pm.PackageManager.NameNotFoundException) {
+                        publishStatus("برنامهٔ انتخاب‌شده نصب نیست: $app")
+                    }
+                }
+                check(allowedCount > 0) { "برای حالت «فقط برنامه‌های انتخاب‌شده» حداقل یک برنامهٔ نصب‌شده انتخاب کن." }
+            } else {
+                builder.addDisallowedApplication(packageName)
+                if (splitMode == "bypassSelected") {
+                    selectedApps.filter { it != packageName }.forEach { app ->
+                        try {
+                            builder.addDisallowedApplication(app)
+                        } catch (_: android.content.pm.PackageManager.NameNotFoundException) {
+                            publishStatus("برنامهٔ انتخاب‌شده نصب نیست: $app")
+                        }
+                    }
+                }
+            }
+            val tun = builder.establish() ?: throw IllegalStateException("Android رابط VPN را ایجاد نکرد")
             vpnInterface = tun
 
             Seq.setContext(applicationContext)
