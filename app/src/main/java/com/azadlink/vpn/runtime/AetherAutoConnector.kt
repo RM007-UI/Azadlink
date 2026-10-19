@@ -6,6 +6,9 @@ import android.os.Looper
 import android.os.Process
 import org.bepass.oblivion.vpn.AetherVpnService
 import org.bepass.oblivion.vpn.TunnelConfig
+import org.bepass.oblivion.vpn.TunnelBus
+import org.bepass.oblivion.vpn.TunnelStage
+import java.util.concurrent.atomic.AtomicBoolean
 import java.io.File
 import java.util.concurrent.TimeUnit
 
@@ -101,7 +104,51 @@ object AetherAutoConnector {
                     "splitTunnelMode" to "disabled",
                     "bypassedApps" to emptyList<String>()
                 )
+                val fallbackScheduled = AtomicBoolean(false)
+                val fallbackStarted = AtomicBoolean(false)
+                val sawConnecting = AtomicBoolean(false)
+                lateinit var statusListener: (org.bepass.oblivion.vpn.TunnelSnapshot) -> Unit
+                statusListener = { snapshot ->
+                    when (snapshot.stage) {
+                        TunnelStage.CONNECTING -> {
+                            sawConnecting.set(true)
+                            if (fallbackScheduled.get()) fallbackStarted.set(true)
+                        }
+                        TunnelStage.CONNECTED -> {
+                            TunnelBus.removeStatusListener(statusListener)
+                            onStatusOnMain(onStatus, "تونل MASQUE برقرار شد.")
+                        }
+                        TunnelStage.FAILED -> {
+                            if (sawConnecting.get() && fallbackScheduled.compareAndSet(false, true)) {
+                                sawConnecting.set(false)
+                                onStatusOnMain(onStatus, "MASQUE روی HTTP/3 در این شبکه درگاه سالم پیدا نکرد؛ تلاش جایگزین با HTTP/2 و obfuscation قوی‌تر…")
+                                mainHandler.postDelayed({
+                                    AetherVpnService.stop(appContext)
+                                    mainHandler.postDelayed({
+                                        val fallbackArguments = arguments.toMutableList().apply {
+                                            val noizeIndex = indexOf("--noize")
+                                            if (noizeIndex >= 0 && noizeIndex + 1 < size) this[noizeIndex + 1] = "firewall"
+                                            add("--h2")
+                                        }
+                                        val fallbackSettings = settings + mapOf(
+                                            "modeLabel" to "MASQUE H2 fallback",
+                                            "transport" to "h2",
+                                            "obfuscation" to "firewall",
+                                            "noizeProfile" to "firewall"
+                                        )
+                                        AetherVpnService.start(appContext, TunnelConfig.fromMap(fallbackSettings, fallbackArguments))
+                                    }, 1400L)
+                                }, 500L)
+                            } else if (fallbackStarted.get()) {
+                                TunnelBus.removeStatusListener(statusListener)
+                                onStatusOnMain(onStatus, "اتصال MASQUE ناموفق ماند؛ HTTP/3 و تلاش جایگزین HTTP/2 هر دو در این شبکه شکست خوردند.")
+                            }
+                        }
+                        else -> Unit
+                    }
+                }
                 AetherVpnService.start(appContext, TunnelConfig.fromMap(settings, arguments))
+                TunnelBus.addStatusListener(statusListener)
             } catch (error: Throwable) {
                 onStatusOnMain(onStatus, "خطای اتصال: ${error.message ?: error.javaClass.simpleName}")
             }
