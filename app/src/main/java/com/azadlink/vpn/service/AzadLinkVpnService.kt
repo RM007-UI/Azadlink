@@ -63,43 +63,49 @@ class AzadLinkVpnService : VpnService(), CoreCallbackHandler {
             val profile = ProtocolProfile(protocol = protocol, label = currentLabel, rawConfig = raw)
             val config = CoreConfigBuilder.build(profile)
 
-            publishStatus("در حال ایجاد رابط VPN…")
             val routingPrefs = getSharedPreferences("azadlink_routing", MODE_PRIVATE)
             val splitMode = routingPrefs.getString("split_mode", "disabled") ?: "disabled"
             val selectedApps = routingPrefs.getStringSet("selected_apps", emptySet())?.toList() ?: emptyList()
-            val builder = Builder()
-                .setSession("AzadLink · $currentLabel")
-                .setMtu(1500)
-                .addAddress("10.0.0.2", 30)
-                .addRoute("0.0.0.0", 0)
-                .addDnsServer("1.1.1.1")
-                .addAddress("fd00:1:fd00:1::2", 126)
-                .addRoute("::", 0)
-                .addDnsServer("2606:4700:4700::1111")
-            if (splitMode == "onlySelected") {
-                var allowedCount = 0
-                selectedApps.filter { it != packageName }.forEach { app ->
-                    try {
-                        builder.addAllowedApplication(app)
-                        allowedCount++
-                    } catch (_: android.content.pm.PackageManager.NameNotFoundException) {
-                        publishStatus("برنامهٔ انتخاب‌شده نصب نیست: $app")
-                    }
-                }
-                check(allowedCount > 0) { "برای حالت «فقط برنامه‌های انتخاب‌شده» حداقل یک برنامهٔ نصب‌شده انتخاب کن." }
+            val proxyOnly = routingPrefs.getBoolean("proxy_only", false)
+            val tun: ParcelFileDescriptor? = if (proxyOnly) {
+                publishStatus("حالت پراکسی: موتور محلی در حال راه‌اندازی است…")
+                null
             } else {
-                builder.addDisallowedApplication(packageName)
-                if (splitMode == "bypassSelected") {
+                publishStatus("در حال ایجاد رابط VPN…")
+                val builder = Builder()
+                    .setSession("AzadLink · $currentLabel")
+                    .setMtu(1500)
+                    .addAddress("10.0.0.2", 30)
+                    .addRoute("0.0.0.0", 0)
+                    .addDnsServer("1.1.1.1")
+                    .addAddress("fd00:1:fd00:1::2", 126)
+                    .addRoute("::", 0)
+                    .addDnsServer("2606:4700:4700::1111")
+                if (splitMode == "onlySelected") {
+                    var allowedCount = 0
                     selectedApps.filter { it != packageName }.forEach { app ->
                         try {
-                            builder.addDisallowedApplication(app)
+                            builder.addAllowedApplication(app)
+                            allowedCount++
                         } catch (_: android.content.pm.PackageManager.NameNotFoundException) {
                             publishStatus("برنامهٔ انتخاب‌شده نصب نیست: $app")
                         }
                     }
+                    check(allowedCount > 0) { "برای حالت «فقط برنامه‌های انتخاب‌شده» حداقل یک برنامهٔ نصب‌شده انتخاب کن." }
+                } else {
+                    builder.addDisallowedApplication(packageName)
+                    if (splitMode == "bypassSelected") {
+                        selectedApps.filter { it != packageName }.forEach { app ->
+                            try {
+                                builder.addDisallowedApplication(app)
+                            } catch (_: android.content.pm.PackageManager.NameNotFoundException) {
+                                publishStatus("برنامهٔ انتخاب‌شده نصب نیست: $app")
+                            }
+                        }
+                    }
                 }
+                builder.establish() ?: throw IllegalStateException("Android رابط VPN را ایجاد نکرد")
             }
-            val tun = builder.establish() ?: throw IllegalStateException("Android رابط VPN را ایجاد نکرد")
             vpnInterface = tun
 
             Seq.setContext(applicationContext)
@@ -107,10 +113,12 @@ class AzadLinkVpnService : VpnService(), CoreCallbackHandler {
             val controller = Libv2ray.newCoreController(this)
             coreController = controller
             publishStatus("در حال راه‌اندازی موتور Xray…")
-            controller.startLoop(config, tun.fd)
+            // AndroidLibXrayLite documents fd=0 as proxy-only mode without a TUN interface.
+            controller.startLoop(config, tun?.fd ?: 0)
             check(controller.isRunning) { "هستهٔ Xray اجرا نشد" }
-            publishStatus("موتور اجرا شد؛ در حال آزمون عبور ترافیک…")
-            verifyTrafficThroughTunnel()
+            publishStatus(if (proxyOnly) "موتور اجرا شد؛ در حال آزمون پراکسی محلی…" else "موتور اجرا شد؛ در حال آزمون عبور ترافیک…")
+            verifyTrafficThroughTunnel(proxyOnly)
+
         } catch (error: Throwable) {
             stopTunnel("خطای اتصال: ${error.message ?: error.javaClass.simpleName}")
         }
@@ -150,7 +158,7 @@ class AzadLinkVpnService : VpnService(), CoreCallbackHandler {
         return 0
     }
 
-    private fun verifyTrafficThroughTunnel() {
+    private fun verifyTrafficThroughTunnel(proxyOnly: Boolean = false) {
         try {
             val socksProxy = java.net.Proxy(
                 java.net.Proxy.Type.SOCKS,
@@ -169,7 +177,7 @@ class AzadLinkVpnService : VpnService(), CoreCallbackHandler {
                 connection.disconnect()
             }
             if (code !in 200..399) throw IllegalStateException("آزمون اینترنت پاسخ HTTP $code داد")
-            publishStatus("متصل · عبور ترافیک از تونل تأیید شد")
+            publishStatus(if (proxyOnly) "پراکسی محلی فعال و آزموده شد · SOCKS5 127.0.0.1:10808" else "متصل · عبور ترافیک از تونل تأیید شد")
         } catch (error: Throwable) {
             stopTunnel("اتصال تونل تأیید نشد: ${error.message ?: "آزمون اینترنت ناموفق بود"}")
         }
