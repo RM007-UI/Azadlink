@@ -3,6 +3,12 @@ on:
   push:
   pull_request:
   workflow_dispatch:
+
+# Keep only the newest build for a branch; cancel superseded runs.
+concurrency:
+  group: azadlink-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test-and-build:
     runs-on: ubuntu-latest
