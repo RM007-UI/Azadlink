@@ -101,7 +101,7 @@ class MainActivity : Activity() {
                 Protocol.PSIPHON -> {
                     val embedded = ExternalEngineProfiles.embeddedPsiphonConfig(profile.rawConfig)
                     if (embedded == null && !PsiphonTunnelRuntime.canLoad(profile.rawConfig, this))
-                        throw IllegalArgumentException("تنظیمات JSON رسمی Psiphon را با دکمهٔ بالای کادر وارد کن")
+                        throw IllegalArgumentException("اتصال خودکار Psiphon هنوز به موتور رسمی وصل نشده؛ برای Psiphon کانفیگ دستی لازم نیست.")
                 }
                 Protocol.MASTER_DNS, Protocol.STORM_DNS -> ExternalEngineProfiles.parseDnsTunnel(profile)
                 Protocol.DNSTT -> ExternalEngineProfiles.parseDnstt(profile.rawConfig)
@@ -155,7 +155,7 @@ class MainActivity : Activity() {
         }
         content.addView(space(10)); content.addView(text("واردکردن کانفیگ",20,Color.WHITE,true))
         content.addView(text("هر خط یک پروفایل؛ اطلاعات محرمانهٔ کانفیگ را در چت یا لاگ منتشر نکن.",13,Color.rgb(155,174,200)))
-        content.addView(space(6)); content.addView(button("واردکردن تنظیمات JSON رسمی Psiphon") { importPsiphonConfig() })
+        content.addView(space(6)); content.addView(button("Psiphon · اتصال خودکار، بدون کانفیگ") { Toast.makeText(this, "درست می‌گی؛ Psiphon کانفیگ دستی نمی‌خواهد. اتصال خودکار در این بیلد هنوز به موتور رسمی وصل نشده است.", Toast.LENGTH_LONG).show() })
         content.addView(text("MasterDNS/StormDNS: لینک JSON-base64 با configToml و resolvers؛ DNSTT: dnstt://دامنه?pubkey=کلید۶۴رقمی&udp=IP:53&listenPort=18082",12,Color.rgb(155,174,200)))
         profileInput = EditText(this).apply {
             hint="vless://… یا masque://… یا psiphon://… یا [Interface]…"; setHintTextColor(Color.GRAY); setTextColor(Color.WHITE)
