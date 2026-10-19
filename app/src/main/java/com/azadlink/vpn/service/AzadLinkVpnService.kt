@@ -73,6 +73,7 @@ class AzadLinkVpnService : VpnService(), CoreCallbackHandler {
                 .addAddress("fd00:1:fd00:1::2", 126)
                 .addRoute("::", 0)
                 .addDnsServer("2606:4700:4700::1111")
+                .addDisallowedApplication(packageName)
                 .establish() ?: throw IllegalStateException("Android رابط VPN را ایجاد نکرد")
             vpnInterface = tun
 
@@ -127,7 +128,11 @@ class AzadLinkVpnService : VpnService(), CoreCallbackHandler {
 
     private fun verifyTrafficThroughTunnel() {
         try {
-            val connection = (java.net.URL("https://www.cloudflare.com/cdn-cgi/trace").openConnection()
+            val socksProxy = java.net.Proxy(
+                java.net.Proxy.Type.SOCKS,
+                java.net.InetSocketAddress("127.0.0.1", 10808)
+            )
+            val connection = (java.net.URL("https://www.cloudflare.com/cdn-cgi/trace").openConnection(socksProxy)
                 as javax.net.ssl.HttpsURLConnection).apply {
                 connectTimeout = 12_000
                 readTimeout = 12_000
