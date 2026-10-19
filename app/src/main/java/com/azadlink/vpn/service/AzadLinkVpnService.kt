@@ -56,7 +56,7 @@ class AzadLinkVpnService : VpnService(), CoreCallbackHandler {
         try {
             val protocol = runCatching { Protocol.valueOf(protocolName) }
                 .getOrElse { throw IllegalArgumentException("پروتکل ناشناخته است: $protocolName") }
-            require(protocol in setOf(Protocol.VLESS, Protocol.VMESS, Protocol.TROJAN, Protocol.SHADOWSOCKS)) {
+            require(protocol in setOf(Protocol.VLESS, Protocol.VMESS, Protocol.TROJAN, Protocol.SHADOWSOCKS, Protocol.WIREGUARD)) {
                 "موتور Xray برای $protocolName انتخاب نشده است."
             }
             publishStatus("در حال ساخت کانفیگ $protocolName…")
