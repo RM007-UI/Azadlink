@@ -166,7 +166,7 @@ class MainActivity : Activity() {
         content.addView(space(8)); content.addView(button("تشخیص و افزودن کانفیگ") { importProfiles() }); content.addView(space(14))
         content.addView(text("کانفیگ‌های شناسایی‌شده",20,Color.WHITE,true))
         profileList = LinearLayout(this).apply { orientation=LinearLayout.VERTICAL }; content.addView(profileList); content.addView(space(20))
-        content.addView(text("هر ۱۰ پروتکل در همین اپ هستند؛ در هر لحظه فقط یکی تونل Android را در اختیار می‌گیرد. اتصال واقعی به هستهٔ باینری داخل APK و تنظیمات معتبر سرور نیاز دارد. پل‌های DNS-tunnel در این نسخه TCP-only هستند.",13,Color.rgb(255,213,128)))
+        content.addView(text("پیش‌نمایش اولیهٔ رابط کاربری است؛ موتورهای اتصال هنوز یکپارچه و روی گوشی آزمایش نشده‌اند. فعلاً اتصال واقعی برقرار نمی‌شود.",13,Color.rgb(255,213,128)))
         root.addView(scroll,LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,0,1f)); setContentView(root)
     }
     private fun importProfiles() {
