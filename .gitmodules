@@ -1,0 +1,3 @@
+[submodule "oblivion-upstream"]
+	path = oblivion-upstream
+	url = https://github.com/bepass-org/oblivion.git
