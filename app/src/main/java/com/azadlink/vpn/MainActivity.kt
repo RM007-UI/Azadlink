@@ -133,41 +133,123 @@ class MainActivity : Activity() {
         topStatus.text = "وضعیت: در حال قطع اتصال"
     }
     private fun buildUi() {
-        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.rgb(12,17,28)); setPadding(dp(18),dp(18),dp(18),dp(18)) }
+        val bg = Color.rgb(10, 13, 24)
+        val panel = Color.rgb(20, 25, 42)
+        val muted = Color.rgb(154, 166, 192)
+        val accent = Color.rgb(126, 102, 255)
+        window.statusBarColor = bg
+        window.navigationBarColor = bg
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(bg)
+        }
         val scroll = ScrollView(this)
-        val content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(22), dp(20), dp(28))
+        }
         scroll.addView(content)
-        content.addView(text("AzadLink",30,Color.WHITE,true))
-        content.addView(text("Multi-core VPN · نسخهٔ آزمایشی 0.3",14,Color.rgb(155,174,200)))
-        content.addView(space(14))
-        topStatus = text("وضعیت: آمادهٔ واردکردن کانفیگ",14,Color.rgb(255,213,128))
-        topStatus.setPadding(dp(12),dp(12),dp(12),dp(12)); topStatus.setBackgroundColor(Color.rgb(44,38,26)); content.addView(topStatus)
-        content.addView(space(6)); content.addView(button("قطع اتصال") { disconnectVpn() }); content.addView(space(16))
-        content.addView(text("موتورهای موجود در همین نسخه",20,Color.WHITE,true))
-        Protocol.entries.forEach { protocol ->
+        val brandRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        val brandMark = TextView(this).apply {
+            text = "A"
+            textSize = 23f
+            gravity = Gravity.CENTER
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(Color.WHITE)
+            setBackgroundColor(accent)
+            layoutParams = LinearLayout.LayoutParams(dp(48), dp(48))
+        }
+        val brandText = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(12), 0, 0, 0) }
+        brandText.addView(text("AzadLink", 24, Color.WHITE, true))
+        brandText.addView(text("PRIVATE CONNECTION", 10, muted, true))
+        brandRow.addView(brandMark)
+        brandRow.addView(brandText)
+        content.addView(brandRow)
+        content.addView(space(26))
+
+        val hero = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(18), dp(20), dp(18), dp(20))
+            setBackgroundColor(panel)
+        }
+        hero.addView(text("اتصال امن، ساده و خودکار", 21, Color.WHITE, true))
+        hero.addView(space(6))
+        hero.addView(text("وضعیت واقعی اتصال روی همین گوشی نمایش داده می‌شود.", 13, muted))
+        hero.addView(space(20))
+        topStatus = text("●  آمادهٔ اتصال", 14, Color.rgb(255, 207, 112), true)
+        topStatus.setPadding(dp(13), dp(13), dp(13), dp(13))
+        topStatus.setBackgroundColor(Color.rgb(44, 36, 28))
+        hero.addView(topStatus)
+        hero.addView(space(14))
+        val autoButton = button("اتصال خودکار · MASQUE") {
+            Toast.makeText(this, "هستهٔ Aether و پل ترافیک هنوز در این نسخه بسته‌بندی نشده‌اند؛ اتصال واقعی برقرار نمی‌شود.", Toast.LENGTH_LONG).show()
+        }.apply { setBackgroundColor(accent); textSize = 16f }
+        hero.addView(autoButton, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(54)))
+        hero.addView(space(8))
+        hero.addView(button("قطع اتصال") { disconnectVpn() })
+        content.addView(hero)
+        content.addView(space(22))
+
+        content.addView(text("پروتکل‌ها", 19, Color.WHITE, true))
+        content.addView(space(4))
+        content.addView(text("نمایش پروتکل به معنی آماده‌بودن موتور آن نیست.", 12, muted))
+        content.addView(space(10))
+        val masqueCard = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(15), dp(14), dp(15), dp(14))
+            setBackgroundColor(Color.rgb(31, 30, 58))
+        }
+        masqueCard.addView(text("MASQUE / Aether", 16, Color.WHITE, true))
+        masqueCard.addView(space(3))
+        masqueCard.addView(text("هدف نسخهٔ بعدی: کشف خودکار endpoint، انتخاب مسیر سالم و اتصال بدون واردکردن کانفیگ.", 12, muted))
+        content.addView(masqueCard)
+        content.addView(space(8))
+        Protocol.entries.filter { it != Protocol.MASQUE }.forEach { protocol ->
             val engine = EngineRegistry.forProtocol(protocol)
-            val label = TextView(this).apply {
-                text = "${protocol.displayName}  •  ${engine.name}\n${engine.detail}"
-                setTextColor(Color.rgb(213,224,239)); textSize = 13f
-                setPadding(dp(12),dp(10),dp(12),dp(10)); setBackgroundColor(Color.rgb(24,33,49))
+            val card = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(14), dp(12), dp(14), dp(12))
+                setBackgroundColor(panel)
             }
-            val params = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT); params.bottomMargin=dp(7); content.addView(label,params)
+            card.addView(text(protocol.displayName, 15, Color.WHITE, true))
+            card.addView(text(engine.detail, 12, muted))
+            val params = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+            params.bottomMargin = dp(7)
+            content.addView(card, params)
         }
-        content.addView(space(10)); content.addView(text("واردکردن کانفیگ",20,Color.WHITE,true))
-        content.addView(text("هر خط یک پروفایل؛ اطلاعات محرمانهٔ کانفیگ را در چت یا لاگ منتشر نکن.",13,Color.rgb(155,174,200)))
-        content.addView(space(6)); content.addView(button("Psiphon · اتصال خودکار، بدون کانفیگ") { Toast.makeText(this, "درست می‌گی؛ Psiphon کانفیگ دستی نمی‌خواهد. اتصال خودکار در این بیلد هنوز به موتور رسمی وصل نشده است.", Toast.LENGTH_LONG).show() })
-        content.addView(text("MasterDNS/StormDNS: لینک JSON-base64 با configToml و resolvers؛ DNSTT: dnstt://دامنه?pubkey=کلید۶۴رقمی&udp=IP:53&listenPort=18082",12,Color.rgb(155,174,200)))
+
+        content.addView(space(18))
+        content.addView(text("افزودن پروفایل", 19, Color.WHITE, true))
+        content.addView(space(4))
+        content.addView(text("برای پروتکل‌هایی که به کانفیگ نیاز دارند؛ اطلاعات خصوصی را با کسی به اشتراک نگذار.", 12, muted))
         profileInput = EditText(this).apply {
-            hint="vless://… یا masque://… یا psiphon://… یا [Interface]…"; setHintTextColor(Color.GRAY); setTextColor(Color.WHITE)
-            textSize=14f; minLines=3; maxLines=7; gravity=Gravity.TOP or Gravity.START
-            setPadding(dp(12),dp(12),dp(12),dp(12)); setBackgroundColor(Color.rgb(24,33,49))
+            hint = "vless://…  یا  wireguard://…"
+            setHintTextColor(Color.rgb(111, 123, 149))
+            setTextColor(Color.WHITE)
+            textSize = 14f
+            minLines = 3
+            maxLines = 7
+            gravity = Gravity.TOP or Gravity.START
+            setPadding(dp(14), dp(13), dp(14), dp(13))
+            setBackgroundColor(panel)
         }
-        content.addView(space(8)); content.addView(profileInput,LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT))
-        content.addView(space(8)); content.addView(button("تشخیص و افزودن کانفیگ") { importProfiles() }); content.addView(space(14))
-        content.addView(text("کانفیگ‌های شناسایی‌شده",20,Color.WHITE,true))
-        profileList = LinearLayout(this).apply { orientation=LinearLayout.VERTICAL }; content.addView(profileList); content.addView(space(20))
-        content.addView(text("پیش‌نمایش اولیهٔ رابط کاربری است؛ موتورهای اتصال هنوز یکپارچه و روی گوشی آزمایش نشده‌اند. فعلاً اتصال واقعی برقرار نمی‌شود.",13,Color.rgb(255,213,128)))
-        root.addView(scroll,LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,0,1f)); setContentView(root)
+        content.addView(space(10))
+        content.addView(profileInput, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        content.addView(space(10))
+        content.addView(button("تشخیص و افزودن پروفایل") { importProfiles() })
+        content.addView(space(18))
+        content.addView(text("پروفایل‌های شما", 19, Color.WHITE, true))
+        content.addView(space(9))
+        profileList = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        content.addView(profileList)
+        content.addView(space(14))
+        content.addView(text("نسخهٔ فعلی رابط کاربری بازطراحی شده است؛ موتور Aether و مسیردهی TUN هنوز باید جداگانه یکپارچه و روی دستگاه آزمایش شوند.", 12, Color.rgb(255, 196, 116)))
+        root.addView(scroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+        setContentView(root)
+        renderProfiles()
     }
     private fun importProfiles() {
         val result=ProtocolParser.parse(profileInput.text?.toString().orEmpty()); var added=0
