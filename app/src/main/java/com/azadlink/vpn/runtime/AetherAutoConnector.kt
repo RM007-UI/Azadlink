@@ -102,7 +102,6 @@ object AetherAutoConnector {
                     "bypassedApps" to emptyList<String>()
                 )
                 AetherVpnService.start(appContext, TunnelConfig.fromMap(settings, arguments))
-                onStatusOnMain(onStatus, "درخواست تونل ارسال شد؛ منتظر تأیید اتصال واقعی…")
             } catch (error: Throwable) {
                 onStatusOnMain(onStatus, "خطای اتصال: ${error.message ?: error.javaClass.simpleName}")
             }
