@@ -1,13 +1,13 @@
 package com.azadlink.vpn.service
 
-import android.app.Service
+import android.net.VpnService
 import android.content.Intent
 import android.os.IBinder
 
 /**
  * UI-preview placeholder. It intentionally does not establish a VPN tunnel yet.
  */
-class AzadLinkVpnService : Service() {
+class AzadLinkVpnService : VpnService() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
