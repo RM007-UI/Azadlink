@@ -186,7 +186,9 @@ object CoreConfigBuilder {
         val host = uri.host?.takeIf { it.isNotBlank() }
             ?: throw IllegalArgumentException("آدرس سرور Shadowsocks نامعتبر است")
         require(uri.port in 1..65535) { "پورت سرور Shadowsocks نامعتبر است" }
-        val info = uri.rawUserInfo?.let { decodeBase64(it) } ?: ""
+        val info = uri.rawUserInfo?.let { userInfo ->
+            if (userInfo.contains(':')) decode(userInfo) else decodeBase64(userInfo)
+        } ?: ""
         val method = info.substringBefore(':')
         val password = info.substringAfter(':', "")
         require(method.isNotBlank() && password.isNotBlank()) { "روش رمزنگاری یا رمز عبور Shadowsocks پیدا نشد" }
