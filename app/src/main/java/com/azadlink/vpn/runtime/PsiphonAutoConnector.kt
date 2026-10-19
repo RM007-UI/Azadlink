@@ -16,6 +16,7 @@ object PsiphonAutoConnector {
 
     fun connect(context: Context, onStatus: (String) -> Unit) {
         try {
+            val routingPrefs = context.applicationContext.getSharedPreferences("azadlink_routing", Context.MODE_PRIVATE)
             val settings = mapOf<String, Any?>(
                 "psiphon" to "only",
                 "psiphonMode" to "auto",
@@ -34,12 +35,12 @@ object PsiphonAutoConnector {
                 "tunnelMtu" to 1500,
                 "coreMtu" to 0,
                 "allowLan" to false,
-                "proxyOnly" to false,
+                "proxyOnly" to routingPrefs.getBoolean("proxy_only", false),
                 "quickReconnect" to true,
                 "dnsPrimary" to "1.1.1.1",
                 "dnsSecondary" to "1.0.0.1",
-                "splitTunnelMode" to "disabled",
-                "bypassedApps" to emptyList<String>()
+                "splitTunnelMode" to (routingPrefs.getString("split_mode", "disabled") ?: "disabled"),
+                "bypassedApps" to (routingPrefs.getStringSet("selected_apps", emptySet())?.toList() ?: emptyList<String>())
             )
             AetherVpnService.start(
                 context.applicationContext,
