@@ -23,6 +23,7 @@ import android.widget.Toast
 import android.net.VpnService
 import android.content.ActivityNotFoundException
 import com.azadlink.vpn.runtime.ExternalEngineProfiles
+import com.azadlink.vpn.runtime.PsiphonAutoConnector
 import com.azadlink.vpn.runtime.PsiphonTunnelRuntime
 import com.azadlink.vpn.service.AzadLinkVpnService
 import com.azadlink.vpn.core.EngineRegistry
@@ -42,6 +43,7 @@ class MainActivity : Activity() {
     private lateinit var topStatus: TextView
     private var pendingConnectProfile: ProtocolProfile? = null
     private var pendingAutoConnect = false
+    private var pendingPsiphonAuto = false
     private var receiverRegistered = false
     private val tunnelStatusListener: (TunnelSnapshot) -> Unit = { snapshot ->
         runOnUiThread {
@@ -111,6 +113,12 @@ class MainActivity : Activity() {
             return
         }
         if (requestCode != REQUEST_VPN_PERMISSION) return
+        if (pendingPsiphonAuto) {
+            pendingPsiphonAuto = false
+            if (resultCode == RESULT_OK) startPsiphonAutoConnect()
+            else Toast.makeText(this, "اجازهٔ VPN داده نشد", Toast.LENGTH_LONG).show()
+            return
+        }
         if (pendingAutoConnect) {
             pendingAutoConnect = false
             if (resultCode == RESULT_OK) startAutoConnect()
@@ -127,6 +135,10 @@ class MainActivity : Activity() {
         topStatus.text = "وضعیت: " + (prefs.getString(AzadLinkVpnService.KEY_MESSAGE, "آمادهٔ اتصال") ?: "آمادهٔ اتصال")
     }
     private fun requestConnect(profile: ProtocolProfile) {
+        if (profile.protocol == Protocol.PSIPHON) {
+            requestPsiphonAutoConnect()
+            return
+        }
         val validation = runCatching {
             when (profile.protocol) {
                 Protocol.MASQUE, Protocol.WIREGUARD, Protocol.VLESS, Protocol.VMESS, Protocol.TROJAN, Protocol.SHADOWSOCKS -> CoreConfigBuilder.build(profile)
@@ -160,6 +172,22 @@ class MainActivity : Activity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(serviceIntent) else startService(serviceIntent)
         topStatus.text = "وضعیت: درخواست اتصال ارسال شد"
     }
+    private fun requestPsiphonAutoConnect() {
+        val prepareIntent = VpnService.prepare(this)
+        if (prepareIntent != null) {
+            pendingPsiphonAuto = true
+            startActivityForResult(prepareIntent, REQUEST_VPN_PERMISSION)
+        } else startPsiphonAutoConnect()
+    }
+
+    private fun startPsiphonAutoConnect() {
+        topStatus.text = "وضعیت: در حال راه‌اندازی Psiphon…"
+        PsiphonAutoConnector.connect(this) { message ->
+            if (::topStatus.isInitialized) topStatus.text = "وضعیت: $message"
+            if (message.startsWith("خطای Psiphon:")) toast(message)
+        }
+    }
+
     private fun requestAutoConnect() {
         val prepareIntent = VpnService.prepare(this)
         if (prepareIntent != null) {
@@ -373,8 +401,8 @@ class MainActivity : Activity() {
             Protocol.PSIPHON -> {
                 panel.addView(text("این بخش برای اتصال مستقیم طراحی می‌شود و نباید از کاربر فایل JSON بخواهد. در بیلد فعلی، موتور رسمی هنوز به سرویس VPN وصل نشده است.", 12, Color.rgb(255, 198, 111)))
                 panel.addView(space(9))
-                panel.addView(button("بررسی وضعیت موتور Psiphon") {
-                    toast("موتور Psiphon هنوز به سرویس VPN متصل نشده؛ اتصال واقعی برقرار نشد.")
+                panel.addView(button("اتصال مستقیم Psiphon") { requestPsiphonAutoConnect() }.apply {
+                    background = rounded(Color.rgb(132, 103, 255), 14)
                 })
             }
             else -> {
