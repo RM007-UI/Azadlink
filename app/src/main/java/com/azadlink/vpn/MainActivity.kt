@@ -280,6 +280,11 @@ class MainActivity : Activity() {
             background = rounded(Color.rgb(58, 43, 55), 14)
             minHeight = dp(46)
         })
+        hero.addView(space(7))
+        hero.addView(button("گزارش اتصال و خطاها") { showTunnelLogs() }.apply {
+            background = rounded(Color.rgb(37, 43, 65), 14)
+            minHeight = dp(44)
+        })
         content.addView(hero)
         content.addView(space(22))
 
@@ -372,6 +377,29 @@ class MainActivity : Activity() {
         root.addView(scroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
         setContentView(root)
         renderProfiles()
+    }
+
+    private fun showTunnelLogs() {
+        val logs = TunnelBus.readLogs(this).trim().ifBlank { "هنوز گزارشی از موتور Aether ثبت نشده است." }
+        val logView = TextView(this).apply {
+            text = logs.takeLast(14000)
+            textSize = 12f
+            setTextColor(Color.rgb(222, 228, 242))
+            setPadding(dp(14), dp(12), dp(14), dp(12))
+            setTextIsSelectable(true)
+        }
+        val scroll = ScrollView(this).apply { addView(logView) }
+        AlertDialog.Builder(this)
+            .setTitle("گزارش اتصال")
+            .setView(scroll)
+            .setPositiveButton("بستن", null)
+            .setNeutralButton("کپی", null)
+            .show()
+            .getButton(AlertDialog.BUTTON_NEUTRAL)?.setOnClickListener {
+                val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                clipboard.setPrimaryClip(android.content.ClipData.newPlainText("AzadLink logs", logs))
+                toast("گزارش کپی شد.")
+            }
     }
 
     private fun showProtocolDetail(protocol: Protocol) {
