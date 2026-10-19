@@ -13,7 +13,7 @@ jobs:
   test-and-build:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
     env:
       ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
     steps:
@@ -151,6 +151,41 @@ jobs:
         with:
           name: azadlink-debug-apk-arm64
           path: app/build/outputs/apk/debug/app-debug.apk
+      - name: Build signed release APK
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        env:
+          AZADLINK_KEYSTORE_BASE64: ${{ secrets.AZADLINK_KEYSTORE_BASE64 }}
+          AZADLINK_STORE_PASSWORD: ${{ secrets.AZADLINK_STORE_PASSWORD }}
+          AZADLINK_KEY_ALIAS: ${{ secrets.AZADLINK_KEY_ALIAS }}
+          AZADLINK_KEY_PASSWORD: ${{ secrets.AZADLINK_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for name in AZADLINK_KEYSTORE_BASE64 AZADLINK_STORE_PASSWORD AZADLINK_KEY_ALIAS AZADLINK_KEY_PASSWORD; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "::error::Missing GitHub Actions secret: $name. Configure the stable release keystore before tagging a release."
+              exit 1
+            fi
+          done
+          keystore="$RUNNER_TEMP/azadlink-release.jks"
+          printf '%s' "$AZADLINK_KEYSTORE_BASE64" | base64 --decode > "$keystore"
+          test -s "$keystore"
+          echo "AZADLINK_KEYSTORE_PATH=$keystore" >> "$GITHUB_ENV"
+          export AZADLINK_KEYSTORE_PATH="$keystore"
+          gradle -PaetherAbi=arm64-v8a assembleRelease
+      - name: Upload signed APK as workflow artifact
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@v4
+        with:
+          name: azadlink-release-apk
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+      - name: Publish signed APK to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: app/build/outputs/apk/release/app-release.apk
+          generate_release_notes: true
       - name: Publish build summary
         if: always()
         run: |
