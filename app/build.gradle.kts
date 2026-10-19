@@ -1,5 +1,10 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
+plugins {
+    id("com.android.application")
+    id("org.jetbrains.kotlin.android")
+}
+
 val releaseKeystorePath = System.getenv("AZADLINK_KEYSTORE_PATH")
 val releaseStorePassword = System.getenv("AZADLINK_STORE_PASSWORD")
 val releaseKeyAlias = System.getenv("AZADLINK_KEY_ALIAS")
@@ -9,10 +14,6 @@ val releaseSigningConfigured = !releaseKeystorePath.isNullOrBlank() &&
     !releaseKeyAlias.isNullOrBlank() &&
     !releaseKeyPassword.isNullOrBlank()
 
-plugins {
-    id("com.android.application")
-    id("org.jetbrains.kotlin.android")
-}
 
 android {
     namespace = "com.azadlink.vpn"
@@ -21,8 +22,8 @@ android {
         applicationId = "com.azadlink.vpn"
         minSdk = 26
         targetSdk = 35
-        versionCode = 4
-        versionName = "0.4.0-alpha"
+        versionCode = 5
+        versionName = "0.5.0-alpha"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     signingConfigs {
