@@ -98,6 +98,13 @@ jobs:
           if [[ -f "$core_dir/LICENSE" ]]; then cp "$core_dir/LICENSE" "$GITHUB_WORKSPACE/app/src/main/assets/licenses/Xray-core-MPL-2.0.txt"; fi
           if [[ -f "$core_dir/NOTICE" ]]; then cp "$core_dir/NOTICE" "$GITHUB_WORKSPACE/app/src/main/assets/licenses/Xray-core-NOTICE.txt"; fi
           printf 'Repository: https://github.com/2dust/AndroidLibXrayLite\nBuilt from CI source checkout\n' > "$GITHUB_WORKSPACE/app/src/main/assets/core-runtime-version.txt"
+      # Psiphon v2.0.41 declares toolchain go1.26.5. Its psiphon-tls
+      # dependency uses unsafe layout checks against crypto/tls internals; building
+      # it with Go 1.27 changes ConnectionState layout and panics at process startup.
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.26.5'
+          cache: false
       - name: Build Psiphon ConsoleClient Android executable
         shell: bash
         run: |
@@ -108,6 +115,11 @@ jobs:
           mkdir -p app/src/main/jniLibs/arm64-v8a app/src/main/assets/licenses
           (cd "$src" && GOOS=android GOARCH=arm64 CGO_ENABLED=1 go build -trimpath -ldflags='-s -w -checklinkname=0' -o "$GITHUB_WORKSPACE/app/src/main/jniLibs/arm64-v8a/libpsiphon.so" ./ConsoleClient)
           cp "$src/LICENSE" app/src/main/assets/licenses/Psiphon-GPL-3.0.txt
+      # Restore the toolchain used by the other Go-based cores.
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.27.0'
+          cache: false
       - name: Build MasterDNS, StormDNS and DNSTT Android executables
         shell: bash
         run: |
