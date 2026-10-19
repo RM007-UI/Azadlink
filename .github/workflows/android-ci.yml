@@ -8,6 +8,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    env:
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -18,14 +20,18 @@ jobs:
         with:
           go-version: '1.27.0'
           cache: false
-      - uses: android-actions/setup-android@v3
+      - name: Configure preinstalled Android SDK
+        run: |
+          echo "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+          echo "$ANDROID_SDK_ROOT/platform-tools" >> "$GITHUB_PATH"
+          test -x "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10.2'
       - name: Install build prerequisites
         run: sudo apt-get update && sudo apt-get install -y jq
       - name: Install Android platform and NDK
-        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'ndk;29.0.14206865'
+        run: yes | sdkmanager --licenses >/dev/null; sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'ndk;29.0.14206865'
       - name: Configure Android NDK
         run: |
           echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/29.0.14206865" >> "$GITHUB_ENV"
