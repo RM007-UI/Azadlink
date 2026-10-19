@@ -6,7 +6,7 @@ enum class Protocol(
     val engineFamily: EngineFamily,
     val note: String,
 ) {
-    MASQUE("MASQUE", "masque", EngineFamily.XRAY_CORE, "نیازمند Xray-core سازگار با MASQUE"),
+    MASQUE("MASQUE", "masque", EngineFamily.AETHER, "نیازمند هستهٔ Aether و پل واقعی ترافیک VPN"),
     PSIPHON("Psiphon", "psiphon", EngineFamily.PSIPHON, "نیازمند موتور رسمی Psiphon و تنظیمات معتبر"),
     WIREGUARD("WireGuard", "wireguard", EngineFamily.WIREGUARD, "کانفیگ استاندارد به WireGuard outbound هستهٔ Xray تبدیل می‌شود"),
     MASTER_DNS("MasterDNS", "masterdns", EngineFamily.MASTER_DNS, "نیازمند موتور MasterDnsVPN و سرور اختصاصی"),
@@ -16,6 +16,7 @@ enum class Protocol(
     VMESS("VMess", "vmess", EngineFamily.XRAY_CORE, "نیازمند core سازگار با Xray"),
     TROJAN("Trojan", "trojan", EngineFamily.XRAY_CORE, "نیازمند core سازگار با Xray"),
     SHADOWSOCKS("Shadowsocks", "ss", EngineFamily.XRAY_CORE, "نیازمند core سازگار با Xray");
+
     companion object {
         fun fromScheme(scheme: String): Protocol? {
             if (scheme.equals("shadowsocks", ignoreCase = true)) return SHADOWSOCKS
@@ -23,4 +24,5 @@ enum class Protocol(
         }
     }
 }
-enum class EngineFamily { XRAY_CORE, PSIPHON, WIREGUARD, MASTER_DNS, STORM_DNS, DNSTT }
+
+enum class EngineFamily { AETHER, XRAY_CORE, PSIPHON, WIREGUARD, MASTER_DNS, STORM_DNS, DNSTT }
