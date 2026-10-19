@@ -18,6 +18,17 @@ jobs:
       ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Verify pinned Aether and TUN bridge sources are present
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f oblivion-upstream/android/aether-vpn/src/main/kotlin/org/bepass/oblivion/vpn/AetherVpnService.kt
+          test -f oblivion-upstream/android/aether-vpn/src/main/kotlin/org/bepass/oblivion/vpn/TunnelBundle.kt
+          test -f oblivion-upstream/aetherproject/aether/Cargo.toml
+          test -f oblivion-upstream/android/aether-vpn/src/main/jni/hev-socks5-tunnel/Android.mk
+          echo "Pinned upstream Aether, Rust core, and hev TUN bridge sources are present."
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -99,9 +110,8 @@ jobs:
         if: always()
         run: |
           {
-            echo '### AzadLink multi-engine build'
-            echo '- Xray / MASQUE / WireGuard runtime is built from AndroidLibXrayLite source.'
-            echo '- Psiphon uses the upstream ConsoleClient as a loopback SOCKS engine.'
-            echo '- MasterDNS, StormDNS and DNSTT use their upstream Go clients as loopback TCP engines.'
-            echo '- This build is a UI preview only. Engine integration and live VPN traffic routing are not verified.'
+            echo '### AzadLink build'
+            echo '- The pinned Oblivion/Aether and hev-socks5-tunnel source trees are checked out recursively.'
+            echo '- The current AzadLink VPN service is still a placeholder; native Aether service integration and live VPN traffic routing are not yet verified.'
+            echo '- A successful APK build does not by itself mean the VPN tunnel works.'
           } >> "$GITHUB_STEP_SUMMARY"
