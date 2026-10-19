@@ -83,7 +83,7 @@ class AzadLinkVpnService : VpnService(), CoreCallbackHandler {
             coreController = controller
             publishStatus("در حال راه‌اندازی موتور Xray…")
             val startError = controller.startLoop(config, tun.fd)
-            if (startError != null) throw IllegalStateException(startError.message ?: "خطای راه‌اندازی Xray")
+            if (!startError.isNullOrBlank()) throw IllegalStateException(startError)
             check(controller.isRunning) { "هستهٔ Xray اجرا نشد" }
             publishStatus("موتور اجرا شد؛ در حال آزمون عبور ترافیک…")
             verifyTrafficThroughTunnel()
