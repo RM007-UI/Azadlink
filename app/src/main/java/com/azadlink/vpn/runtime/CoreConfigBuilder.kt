@@ -50,6 +50,17 @@ object CoreConfigBuilder {
                 })
             })
         }
+        val localSocks = JsonObject().apply {
+            addProperty("tag", "socks-in")
+            addProperty("listen", "127.0.0.1")
+            addProperty("port", 10808)
+            addProperty("protocol", "socks")
+            add("settings", JsonObject().apply {
+                addProperty("auth", "noauth")
+                addProperty("udp", true)
+                addProperty("userLevel", 0)
+            })
+        }
         val direct = JsonObject().apply {
             addProperty("tag", "direct")
             addProperty("protocol", "freedom")
@@ -63,13 +74,13 @@ object CoreConfigBuilder {
         val rules = JsonArray().apply {
             add(JsonObject().apply {
                 addProperty("type", "field")
-                add("inboundTag", JsonArray().apply { add("tun-in") })
+                add("inboundTag", JsonArray().apply { add("tun-in"); add("socks-in") })
                 addProperty("outboundTag", "proxy")
             })
         }
         return JsonObject().apply {
             add("log", JsonObject().apply { addProperty("loglevel", "warning") })
-            add("inbounds", JsonArray().apply { add(tun) })
+            add("inbounds", JsonArray().apply { add(tun); add(localSocks) })
             add("outbounds", JsonArray().apply { add(proxy); add(direct); add(block) })
             add("routing", JsonObject().apply {
                 addProperty("domainStrategy", "IPIfNonMatch")
