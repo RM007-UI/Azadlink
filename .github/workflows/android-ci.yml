@@ -29,6 +29,9 @@ jobs:
           test -f oblivion-upstream/aetherproject/aether/Cargo.toml
           test -f oblivion-upstream/android/aether-vpn/src/main/jni/hev-socks5-tunnel/Android.mk
           echo "Pinned upstream Aether, Rust core, and hev TUN bridge sources are present."
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -44,14 +47,14 @@ jobs:
           test -x "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
       - uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.10.2'
+          gradle-version: '9.1.0'
       - name: Install build prerequisites
         run: sudo apt-get update && sudo apt-get install -y jq
       - name: Install Android platform and NDK
-        run: yes | sdkmanager --licenses >/dev/null; sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'ndk;29.0.14206865'
+        run: yes | sdkmanager --licenses >/dev/null; sdkmanager 'platforms;android-35' 'platforms;android-37' 'build-tools;36.0.0' 'ndk;29.0.13846066'
       - name: Configure Android NDK
         run: |
-          echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/29.0.14206865" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/29.0.13846066" >> "$GITHUB_ENV"
           echo "ANDROID_NDK_ROOT=$ANDROID_SDK_ROOT/ndk/29.0.14206865" >> "$GITHUB_ENV"
       - name: Build Xray gomobile AAR from source (TUN, MASQUE and WireGuard outbound)
         shell: bash
@@ -101,7 +104,7 @@ jobs:
           build_client https://github.com/nullroute1970/StormDNS.git main ./cmd/client libazadlink_stormdns
           build_client https://github.com/mahsanet/dnstt.git master ./cmd/dnstt-client libazadlink_dnstt
       - name: Run unit tests and assemble debug APK
-        run: gradle assembleDebug
+        run: gradle -PaetherAbi=arm64-v8a testDebugUnitTest assembleDebug
       - uses: actions/upload-artifact@v4
         with:
           name: azadlink-debug-apk-arm64
@@ -111,7 +114,7 @@ jobs:
         run: |
           {
             echo '### AzadLink build'
-            echo '- The pinned Oblivion/Aether and hev-socks5-tunnel source trees are checked out recursively.'
-            echo '- The current AzadLink VPN service is still a placeholder; native Aether service integration and live VPN traffic routing are not yet verified.'
+            echo '- The pinned Oblivion/Aether and hev-socks5-tunnel source trees are checked out recursively and the upstream Aether Android library is included as a Gradle module.'
+            echo '- Native Aether and the TUN bridge are built through the upstream Android library; app-level service adapter and live VPN traffic routing still require integration and device verification.'
             echo '- A successful APK build does not by itself mean the VPN tunnel works.'
           } >> "$GITHUB_STEP_SUMMARY"
