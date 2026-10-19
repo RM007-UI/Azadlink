@@ -20,14 +20,16 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlin {
-        compilerOptions {
-            jvmTarget.set(JvmTarget.JVM_17)
-        }
-    }
     testOptions { unitTests.isReturnDefaultValues = true }
     packaging { jniLibs.useLegacyPackaging = true }
 }
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_17)
+    }
+}
+
 dependencies {
     implementation(project(":aether-vpn"))
     implementation("com.google.code.gson:gson:2.11.0")
