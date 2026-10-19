@@ -70,27 +70,34 @@ object AetherAutoConnector {
                 }
 
                 onStatusOnMain(onStatus, "هویت آماده است؛ در حال راه‌اندازی تونل MASQUE…")
-                val arguments = listOf(
+                val masquePrefs = appContext.getSharedPreferences("azadlink_masque", Context.MODE_PRIVATE)
+                val scanMode = "balanced"
+                val ipVersion = masquePrefs.getString("ip_version", "both") ?: "both"
+                val obfuscation = masquePrefs.getString("obfuscation", "firewall") ?: "firewall"
+                val transport = masquePrefs.getString("transport", "h2") ?: "h2"
+                val masqueSni = masquePrefs.getString("sni", "www.cloudflare.com")
+                    ?.trim()?.takeIf { it.isNotEmpty() } ?: "www.cloudflare.com"
+                val arguments = mutableListOf(
                     "--bind", "127.0.0.1:$SOCKS_PORT",
                     "--http-proxy", "127.0.0.1:$HTTP_PORT",
-                    "--scan", "balanced",
+                    "--scan", scanMode,
                     "--log-level", "info",
-                    "--ip", "both",
+                    "--ip", ipVersion,
                     "--validate-secs", "10",
                     "--reconnect-secs", "2",
-                    "--noize", "firewall",
+                    "--noize", obfuscation,
                     "--masque",
-                    "--masque-sni", "www.cloudflare.com",
-                    "--h2"
+                    "--masque-sni", masqueSni
                 )
+                if (transport == "h2") arguments.add("--h2")
                 val settings = mapOf<String, Any?>(
                     "protocol" to "masque",
-                    "modeLabel" to "MASQUE H2",
-                    "transport" to "h2",
-                    "scanMode" to "balanced",
-                    "obfuscation" to "firewall",
-                    "noizeProfile" to "firewall",
-                    "ipVersion" to "both",
+                    "modeLabel" to "MASQUE ${transport.uppercase()}",
+                    "transport" to transport,
+                    "scanMode" to scanMode,
+                    "obfuscation" to obfuscation,
+                    "noizeProfile" to obfuscation,
+                    "ipVersion" to ipVersion,
                     "logLevel" to "info",
                     "endpoint" to "",
                     "socksPort" to SOCKS_PORT,
