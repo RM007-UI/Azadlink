@@ -13,4 +13,5 @@ dependencyResolutionManagement {
     }
 }
 rootProject.name = "AzadLink"
-include(":app")
+include(":app", ":aether-vpn")
+project(":aether-vpn").projectDir = file("oblivion-upstream/android/aether-vpn")
