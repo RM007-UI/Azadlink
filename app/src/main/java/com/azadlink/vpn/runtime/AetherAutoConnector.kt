@@ -71,6 +71,7 @@ object AetherAutoConnector {
 
                 onStatusOnMain(onStatus, "هویت آماده است؛ در حال راه‌اندازی تونل MASQUE…")
                 val masquePrefs = appContext.getSharedPreferences("azadlink_masque", Context.MODE_PRIVATE)
+                val routingPrefs = appContext.getSharedPreferences("azadlink_routing", Context.MODE_PRIVATE)
                 val scanMode = "balanced"
                 val ipVersion = masquePrefs.getString("ip_version", "both") ?: "both"
                 val obfuscation = masquePrefs.getString("obfuscation", "firewall") ?: "firewall"
@@ -104,12 +105,12 @@ object AetherAutoConnector {
                     "tunnelMtu" to 1500,
                     "coreMtu" to 0,
                     "allowLan" to false,
-                    "proxyOnly" to false,
+                    "proxyOnly" to routingPrefs.getBoolean("proxy_only", false),
                     "quickReconnect" to true,
                     "dnsPrimary" to "1.1.1.1",
                     "dnsSecondary" to "1.0.0.1",
-                    "splitTunnelMode" to "disabled",
-                    "bypassedApps" to emptyList<String>()
+                    "splitTunnelMode" to (routingPrefs.getString("split_mode", "disabled") ?: "disabled"),
+                    "bypassedApps" to (routingPrefs.getStringSet("selected_apps", emptySet())?.toList() ?: emptyList<String>())
                 )
                 lateinit var statusListener: (org.bepass.oblivion.vpn.TunnelSnapshot) -> Unit
                 statusListener = { snapshot ->
