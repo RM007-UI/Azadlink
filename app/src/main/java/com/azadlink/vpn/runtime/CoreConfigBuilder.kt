@@ -25,7 +25,7 @@ object CoreConfigBuilder {
             Protocol.VMESS -> vmess(profile.rawConfig)
             Protocol.TROJAN -> trojan(profile.rawConfig)
             Protocol.SHADOWSOCKS -> shadowsocks(profile.rawConfig)
-            Protocol.WIREGUARD -> throw IllegalArgumentException("تبدیل خودکار WireGuard به outbound هنوز پیاده‌سازی نشده؛ این پروفایل اجرا نمی‌شود.")
+            Protocol.WIREGUARD -> wireguard(profile.rawConfig)
             else -> error("unsupported protocol")
         }
         return fullConfig(outbound).toString()
@@ -192,6 +192,56 @@ object CoreConfigBuilder {
         return JsonObject().apply {
             addProperty("tag", "proxy")
             addProperty("protocol", "shadowsocks")
+            add("settings", settings)
+        }
+    }
+
+    private fun wireguard(raw: String): JsonObject {
+        val sections = linkedMapOf<String, MutableMap<String, String>>()
+        var current = ""
+        raw.lineSequence().forEach { original ->
+            val line = original.substringBefore('#').substringBefore(';').trim()
+            if (line.isEmpty()) return@forEach
+            if (line.startsWith("[") && line.endsWith("]")) {
+                current = line.substring(1, line.length - 1).trim().lowercase()
+                sections.putIfAbsent(current, linkedMapOf())
+            } else if (current.isNotEmpty() && '=' in line) {
+                val key = line.substringBefore('=').trim().lowercase()
+                val value = line.substringAfter('=').trim()
+                sections[current]?.set(key, value)
+            }
+        }
+        val iface = sections["interface"] ?: throw IllegalArgumentException("بخش [Interface] در WireGuard پیدا نشد")
+        val peer = sections["peer"] ?: throw IllegalArgumentException("بخش [Peer] در WireGuard پیدا نشد")
+        val privateKey = iface["privatekey"].orEmpty()
+        val publicKey = peer["publickey"].orEmpty()
+        val endpoint = peer["endpoint"].orEmpty()
+        require(privateKey.isNotBlank() && publicKey.isNotBlank() && endpoint.contains(':')) {
+            "PrivateKey، PublicKey یا Endpoint در WireGuard ناقص است"
+        }
+        val addresses = iface["address"].orEmpty().split(',').map { it.trim() }.filter { it.isNotEmpty() }
+        val allowed = peer["allowedips"].orEmpty().split(',').map { it.trim() }.filter { it.isNotEmpty() }
+        val peerConfig = JsonObject().apply {
+            addProperty("publicKey", publicKey)
+            peer["presharedkey"]?.takeIf { it.isNotBlank() }?.let { addProperty("preSharedKey", it) }
+            addProperty("endpoint", endpoint)
+            addProperty("keepAlive", peer["persistentkeepalive"]?.toIntOrNull() ?: 25)
+            if (allowed.isNotEmpty()) add("allowedIPs", JsonArray().apply { allowed.forEach { add(it) } })
+        }
+        val settings = JsonObject().apply {
+            addProperty("secretKey", privateKey)
+            add("address", JsonArray().apply { addresses.forEach { add(it) } })
+            add("peers", JsonArray().apply { add(peerConfig) })
+            addProperty("mtu", 1420)
+            addProperty("noKernelTun", true)
+            add("IsClient", com.google.gson.JsonPrimitive(true))
+            iface["dns"]?.split(',')?.map { it.trim() }?.filter { it.isNotEmpty() }?.let { dns ->
+                add("remoteDNS", JsonArray().apply { dns.forEach { add(it) } })
+            }
+        }
+        return JsonObject().apply {
+            addProperty("tag", "proxy")
+            addProperty("protocol", "wireguard")
             add("settings", settings)
         }
     }
