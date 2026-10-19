@@ -36,6 +36,14 @@ jobs:
           test -f oblivion-upstream/aetherproject/aether/Cargo.toml
           test -f oblivion-upstream/android/aether-vpn/src/main/jni/hev-socks5-tunnel/Android.mk
           echo "Pinned upstream Aether, Rust core, and hev TUN bridge sources are present."
+      - name: Preserve upstream license notices
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p app/src/main/assets/licenses
+          cp oblivion-upstream/LICENSE app/src/main/assets/licenses/Oblivion-LICENSE.txt
+          cp oblivion-upstream/aetherproject/LICENSE app/src/main/assets/licenses/Aether-LICENSE.txt
+          cp oblivion-upstream/android/aether-vpn/src/main/jni/hev-socks5-tunnel/LICENSE app/src/main/assets/licenses/hev-socks5-tunnel-LICENSE.txt
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-linux-android
