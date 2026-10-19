@@ -28,6 +28,10 @@ import com.azadlink.vpn.core.Protocol
 import com.azadlink.vpn.core.ProtocolParser
 import com.azadlink.vpn.core.ProtocolProfile
 import com.azadlink.vpn.runtime.CoreConfigBuilder
+import com.azadlink.vpn.runtime.AetherAutoConnector
+import org.bepass.oblivion.vpn.TunnelBus
+import org.bepass.oblivion.vpn.TunnelSnapshot
+import org.bepass.oblivion.vpn.TunnelStage
 
 class MainActivity : Activity() {
     private val profiles = mutableListOf<ProtocolProfile>()
@@ -35,7 +39,25 @@ class MainActivity : Activity() {
     private lateinit var profileList: LinearLayout
     private lateinit var topStatus: TextView
     private var pendingConnectProfile: ProtocolProfile? = null
+    private var pendingAutoConnect = false
     private var receiverRegistered = false
+    private val tunnelStatusListener: (TunnelSnapshot) -> Unit = { snapshot ->
+        runOnUiThread {
+            if (::topStatus.isInitialized) {
+                val state = when (snapshot.stage) {
+                    TunnelStage.DISCONNECTED -> "قطع"
+                    TunnelStage.CONNECTING -> "در حال اتصال"
+                    TunnelStage.VALIDATING -> "در حال بررسی تونل"
+                    TunnelStage.CONNECTED -> "متصل"
+                    TunnelStage.DISCONNECTING -> "در حال قطع"
+                    TunnelStage.FAILED -> "اتصال ناموفق"
+                }
+                val detail = snapshot.message?.takeIf { it.isNotBlank() }?.let { " · $it" } ?: ""
+                val gateway = snapshot.gateway?.let { " · $it" } ?: ""
+                topStatus.text = "وضعیت واقعی: $state$gateway$detail"
+            }
+        }
+    }
     private val statusReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             val message = intent?.getStringExtra(AzadLinkVpnService.EXTRA_MESSAGE) ?: return
@@ -58,9 +80,11 @@ class MainActivity : Activity() {
             else { @Suppress("DEPRECATION") registerReceiver(statusReceiver, filter) }
             receiverRegistered = true
         }
+        TunnelBus.addStatusListener(tunnelStatusListener)
         refreshState()
     }
     override fun onStop() {
+        TunnelBus.removeStatusListener(tunnelStatusListener)
         if (receiverRegistered) { runCatching { unregisterReceiver(statusReceiver) }; receiverRegistered = false }
         super.onStop()
     }
@@ -85,6 +109,12 @@ class MainActivity : Activity() {
             return
         }
         if (requestCode != REQUEST_VPN_PERMISSION) return
+        if (pendingAutoConnect) {
+            pendingAutoConnect = false
+            if (resultCode == RESULT_OK) startAutoConnect()
+            else Toast.makeText(this, "اجازهٔ VPN داده نشد", Toast.LENGTH_LONG).show()
+            return
+        }
         val profile = pendingConnectProfile
         pendingConnectProfile = null
         if (resultCode == RESULT_OK && profile != null) startVpn(profile)
@@ -128,9 +158,29 @@ class MainActivity : Activity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(serviceIntent) else startService(serviceIntent)
         topStatus.text = "وضعیت: درخواست اتصال ارسال شد"
     }
+    private fun requestAutoConnect() {
+        val prepareIntent = VpnService.prepare(this)
+        if (prepareIntent != null) {
+            pendingAutoConnect = true
+            startActivityForResult(prepareIntent, REQUEST_VPN_PERMISSION)
+        } else {
+            startAutoConnect()
+        }
+    }
+
+    private fun startAutoConnect() {
+        topStatus.text = "وضعیت: در حال آماده‌سازی موتور Aether…"
+        AetherAutoConnector.connect(this) { message ->
+            topStatus.text = "وضعیت: $message"
+            if (message.startsWith("خطای اتصال:")) {
+                Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
     private fun disconnectVpn() {
-        startService(Intent(this, AzadLinkVpnService::class.java).setAction(AzadLinkVpnService.ACTION_DISCONNECT))
-        topStatus.text = "وضعیت: در حال قطع اتصال"
+        AetherAutoConnector.disconnect(this)
+        topStatus.text = "وضعیت: درخواست قطع اتصال ارسال شد"
     }
     private fun buildUi() {
         val bg = Color.rgb(10, 13, 24)
@@ -185,7 +235,7 @@ class MainActivity : Activity() {
         hero.addView(topStatus)
         hero.addView(space(14))
         val autoButton = button("اتصال خودکار · MASQUE") {
-            Toast.makeText(this, "هستهٔ Aether و پل ترافیک هنوز در این نسخه بسته‌بندی نشده‌اند؛ اتصال واقعی برقرار نمی‌شود.", Toast.LENGTH_LONG).show()
+            requestAutoConnect()
         }.apply { setBackgroundColor(accent); textSize = 16f }
         hero.addView(autoButton, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(54)))
         hero.addView(space(8))
