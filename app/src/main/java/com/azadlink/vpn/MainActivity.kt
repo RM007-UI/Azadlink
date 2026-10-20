@@ -911,6 +911,24 @@ class MainActivity : Activity() {
             background = rounded(Color.rgb(23, 29, 48), 12)
         }
         panel.addView(sniInput)
+        panel.addView(space(10))
+
+        addLabel("درگاه دستی (اختیاری)")
+        val endpointInput = EditText(this).apply {
+            setSingleLine(true)
+            setText(prefs.getString("endpoint", "") ?: "")
+            setTextColor(Color.WHITE)
+            setHintTextColor(Color.rgb(111, 123, 149))
+            hint = "مثلاً 162.159.198.64:443"
+            textSize = 14f
+            setPadding(dp(12), dp(10), dp(12), dp(10))
+            background = rounded(Color.rgb(23, 29, 48), 12)
+        }
+        panel.addView(endpointInput)
+        panel.addView(text(
+            "خالی بگذار تا اسکن خودکار انجام شود. درگاه دستی ممکن است تغییر کند؛ اگر جواب ندهد، تلاش جایگزین دوباره اسکن می‌کند.",
+            11, Color.rgb(159, 171, 197)
+        ))
         panel.addView(space(6))
 
         val fragmentCheck = android.widget.CheckBox(this).apply {
@@ -948,6 +966,7 @@ class MainActivity : Activity() {
                     .putString("obfuscation", noiseModes[noiseSpinner.selectedItemPosition])
                     .putString("ip_version", ip)
                     .putString("sni", sniInput.text?.toString()?.trim()?.takeIf { it.isNotBlank() } ?: "www.cloudflare.com")
+                    .putString("endpoint", endpointInput.text?.toString()?.trim()?.takeIf { it.isNotBlank() } ?: "")
                     .putBoolean("fragment", fragmentCheck.isChecked)
                     .putBoolean("auto_fallback", fallbackCheck.isChecked)
                     .apply()
