@@ -46,6 +46,7 @@ class MainActivity : Activity() {
     private var pendingConnectProfile: ProtocolProfile? = null
     private var pendingAutoConnect = false
     private var pendingPsiphonAuto = false
+    private var pendingPsiphonChain = false
     private var receiverRegistered = false
     private val tunnelStatusListener: (TunnelSnapshot) -> Unit = { snapshot ->
         runOnUiThread {
@@ -116,6 +117,12 @@ class MainActivity : Activity() {
             return
         }
         if (requestCode != REQUEST_VPN_PERMISSION) return
+        if (pendingPsiphonChain) {
+            pendingPsiphonChain = false
+            if (resultCode == RESULT_OK) startPsiphonChainConnect()
+            else Toast.makeText(this, "اجازهٔ VPN داده نشد", Toast.LENGTH_LONG).show()
+            return
+        }
         if (pendingPsiphonAuto) {
             pendingPsiphonAuto = false
             if (resultCode == RESULT_OK) startPsiphonAutoConnect()
@@ -185,10 +192,77 @@ class MainActivity : Activity() {
 
     private fun startPsiphonAutoConnect() {
         topStatus.text = "وضعیت: در حال راه‌اندازی Psiphon…"
-        PsiphonAutoConnector.connect(this) { message ->
+        val country = getSharedPreferences("azadlink_psiphon_settings", MODE_PRIVATE)
+            .getString("country", "") ?: ""
+        PsiphonAutoConnector.connect(this, { message ->
             if (::topStatus.isInitialized) topStatus.text = "وضعیت: $message"
             if (message.startsWith("خطای Psiphon:")) Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+        }, country, false)
+    }
+
+    private fun requestPsiphonChainConnect() {
+        val prepareIntent = VpnService.prepare(this)
+        if (prepareIntent != null) {
+            pendingPsiphonChain = true
+            startActivityForResult(prepareIntent, REQUEST_VPN_PERMISSION)
+        } else startPsiphonChainConnect()
+    }
+
+    private fun startPsiphonChainConnect() {
+        topStatus.text = "وضعیت: در حال راه‌اندازی زنجیرهٔ MASQUE → Psiphon…"
+        val country = getSharedPreferences("azadlink_psiphon_settings", MODE_PRIVATE)
+            .getString("country", "") ?: ""
+        PsiphonAutoConnector.connect(this, { message ->
+            if (::topStatus.isInitialized) topStatus.text = "وضعیت: $message"
+            if (message.startsWith("خطای Psiphon:")) Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+        }, country, true)
+    }
+
+    private fun showPsiphonSettings() {
+        val prefs = getSharedPreferences("azadlink_psiphon_settings", MODE_PRIVATE)
+        val countries = listOf(
+            "سریع‌ترین / خودکار" to "",
+            "آمریکا" to "US",
+            "کانادا" to "CA",
+            "بریتانیا" to "GB",
+            "آلمان" to "DE",
+            "هلند" to "NL",
+            "فرانسه" to "FR",
+            "ژاپن" to "JP",
+            "سنگاپور" to "SG",
+            "هند" to "IN"
+        )
+        val saved = prefs.getString("country", "") ?: ""
+        val selected = countries.indexOfFirst { it.second == saved }.coerceAtLeast(0)
+        val picker = android.widget.Spinner(this).apply {
+            adapter = android.widget.ArrayAdapter(
+                this@MainActivity,
+                android.R.layout.simple_spinner_dropdown_item,
+                countries.map { it.first }
+            )
+            setSelection(selected)
         }
+        val panel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(18), dp(10), dp(18), dp(8))
+            addView(text("موقعیت خروجی Psiphon", 15, Color.WHITE, true))
+            addView(space(7))
+            addView(picker)
+            addView(space(8))
+            addView(text(
+                "سریع‌ترین / خودکار یعنی انتخاب کشور را به Psiphon می‌سپارد؛ کشور انتخابی تضمین‌کنندهٔ سرعت یا دسترس‌پذیری نیست.",
+                12, Color.rgb(159, 171, 197)
+            ))
+        }
+        AlertDialog.Builder(this)
+            .setTitle("موقعیت Psiphon")
+            .setView(panel)
+            .setNegativeButton("لغو", null)
+            .setPositiveButton("ذخیره") { _, _ ->
+                prefs.edit().putString("country", countries[picker.selectedItemPosition].second).apply()
+                Toast.makeText(this, "موقعیت Psiphon ذخیره شد.", Toast.LENGTH_SHORT).show()
+            }
+            .show()
     }
 
     private fun requestAutoConnect() {
@@ -594,6 +668,38 @@ class MainActivity : Activity() {
             spaceInto(hero, 8)
             actionButton(hero, "تنظیمات پیشرفته", Color.rgb(51, 51, 91), { showMasqueAdvancedSettings() }, 47)
             spaceInto(hero, 8)
+            actionButton(hero, "تنظیمات پیش‌فرض", Color.rgb(42, 62, 82), {
+                getSharedPreferences("azadlink_masque", MODE_PRIVATE).edit()
+                    .putString("connection_mode", "default")
+                    .putString("transport", "h2")
+                    .putString("scan_mode", "balanced")
+                    .putString("obfuscation", "firewall")
+                    .putString("ip_version", "both")
+                    .putString("sni", "www.cloudflare.com")
+                    .putString("endpoint", "")
+                    .putBoolean("fragment", false)
+                    .putBoolean("auto_fallback", false)
+                    .apply()
+                Toast.makeText(this, "تنظیمات پیش‌فرض MASQUE فعال شد (HTTP/2).", Toast.LENGTH_LONG).show()
+            }, 43)
+            spaceInto(hero, 7)
+            actionButton(hero, "تنظیم خودکار", Color.rgb(44, 105, 105), {
+                getSharedPreferences("azadlink_masque", MODE_PRIVATE).edit()
+                    .putString("connection_mode", "auto")
+                    .putString("transport", "h2")
+                    .putString("scan_mode", "balanced")
+                    .putString("obfuscation", "firewall")
+                    .putString("ip_version", "both")
+                    .putString("sni", "www.cloudflare.com")
+                    .putString("endpoint", "")
+                    .putBoolean("fragment", false)
+                    .putBoolean("auto_fallback", true)
+                    .apply()
+                Toast.makeText(this, "حالت خودکار فعال شد؛ در صورت شکست، اسکن عمیق‌تر امتحان می‌شود.", Toast.LENGTH_LONG).show()
+            }, 43)
+            spaceInto(hero, 8)
+            actionButton(hero, "اتصال زنجیره‌ای MASQUE → Psiphon", Color.rgb(42, 133, 119), { requestPsiphonChainConnect() }, 49)
+            spaceInto(hero, 8)
             actionButton(hero, "قطع اتصال", Color.rgb(75, 42, 59), { disconnectVpn() }, 44)
             page.addView(hero)
             spaceInto(page, 17)
@@ -642,7 +748,14 @@ class MainActivity : Activity() {
             spaceInto(hero, 6)
             labelInto(hero, "هستهٔ Psiphon همراه برنامه اجرا می‌شود. بعد از شروع، وضعیت آمادگی تونل و آزمون پراکسی در گزارش ثبت می‌شود.", 12, Color.rgb(198, 209, 222))
             spaceInto(hero, 17)
+            actionButton(hero, "انتخاب موقعیت خروجی", Color.rgb(51, 51, 91), { showPsiphonSettings() }, 45)
+            spaceInto(hero, 8)
+            val selectedCountry = getSharedPreferences("azadlink_psiphon_settings", MODE_PRIVATE).getString("country", "").orEmpty()
+            labelInto(hero, "موقعیت فعلی: " + (selectedCountry.ifBlank { "سریع‌ترین / خودکار" }), 12, Color.rgb(198, 209, 222))
+            spaceInto(hero, 12)
             actionButton(hero, "اتصال به Psiphon", Color.rgb(39, 165, 143), { requestPsiphonAutoConnect() }, 51)
+            spaceInto(hero, 8)
+            actionButton(hero, "اتصال زنجیره‌ای با MASQUE", Color.rgb(44, 105, 105), { requestPsiphonChainConnect() }, 47)
             spaceInto(hero, 8)
             actionButton(hero, "قطع اتصال", Color.rgb(75, 42, 59), { disconnectVpn() }, 44)
             page.addView(hero)
