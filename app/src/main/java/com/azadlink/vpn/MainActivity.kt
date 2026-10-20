@@ -698,7 +698,7 @@ class MainActivity : Activity() {
                 Toast.makeText(this, "حالت خودکار فعال شد؛ در صورت شکست، اسکن عمیق‌تر امتحان می‌شود.", Toast.LENGTH_LONG).show()
             }, 43)
             spaceInto(hero, 8)
-            actionButton(hero, "اتصال زنجیره‌ای MASQUE → Psiphon", Color.rgb(42, 133, 119), { requestPsiphonChainConnect() }, 49)
+            labelInto(hero, "اتصال زنجیره‌ای از این بخش موقتاً برداشته شده؛ برای استفاده از زنجیرهٔ سالم، وارد تب Psiphon شو.", 12, Color.rgb(206, 209, 234))
             spaceInto(hero, 8)
             actionButton(hero, "قطع اتصال", Color.rgb(75, 42, 59), { disconnectVpn() }, 44)
             page.addView(hero)
