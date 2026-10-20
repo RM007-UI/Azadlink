@@ -169,8 +169,33 @@ jobs:
         with:
           name: azadlink-debug-apk-arm64
           path: app/build/outputs/apk/debug/app-debug.apk
+      - name: Detect release signing configuration
+        id: signing
+        if: github.event_name != 'pull_request'
+        shell: bash
+        env:
+          AZADLINK_KEYSTORE_BASE64: ${{ secrets.AZADLINK_KEYSTORE_BASE64 }}
+          AZADLINK_STORE_PASSWORD: ${{ secrets.AZADLINK_STORE_PASSWORD }}
+          AZADLINK_KEY_ALIAS: ${{ secrets.AZADLINK_KEY_ALIAS }}
+          AZADLINK_KEY_PASSWORD: ${{ secrets.AZADLINK_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          present=0
+          for name in AZADLINK_KEYSTORE_BASE64 AZADLINK_STORE_PASSWORD AZADLINK_KEY_ALIAS AZADLINK_KEY_PASSWORD; do
+            if [[ -n "${!name:-}" ]]; then present=$((present + 1)); fi
+          done
+          if [[ "$present" == "0" ]]; then
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "No release-signing secrets found; publishing the debug artifact only."
+          elif [[ "$present" == "4" ]]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+            echo "All release-signing inputs are present."
+          else
+            echo "::error::Release signing secrets are only partially configured ($present of 4)."
+            exit 1
+          fi
       - name: Build signed release APK
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: github.event_name != 'pull_request' && steps.signing.outputs.enabled == 'true'
         shell: bash
         env:
           AZADLINK_KEYSTORE_BASE64: ${{ secrets.AZADLINK_KEYSTORE_BASE64 }}
@@ -192,14 +217,14 @@ jobs:
           export AZADLINK_KEYSTORE_PATH="$keystore"
           gradle -PaetherAbi=arm64-v8a assembleRelease
       - name: Upload signed APK as workflow artifact
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: github.event_name != 'pull_request' && steps.signing.outputs.enabled == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: azadlink-release-apk
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
       - name: Publish signed APK to GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: github.event_name != 'pull_request' && startsWith(github.ref, 'refs/tags/v') && steps.signing.outputs.enabled == 'true'
         uses: softprops/action-gh-release@v2
         with:
           files: app/build/outputs/apk/release/app-release.apk
@@ -211,5 +236,6 @@ jobs:
             echo '### AzadLink build'
             echo '- The pinned Oblivion/Aether and hev-socks5-tunnel source trees are checked out recursively and the upstream Aether Android library is included as a Gradle module.'
             echo '- Native Aether and the TUN bridge are built through the upstream Android library; app-level service adapter and live VPN traffic routing still require integration and device verification.'
+            echo '- If release-signing secrets are configured, non-PR branch builds also publish a signed APK as an Actions artifact; version tags additionally attach it to a GitHub Release.'
             echo '- A successful APK build does not by itself mean the VPN tunnel works.'
           } >> "$GITHUB_STEP_SUMMARY"
