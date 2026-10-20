@@ -128,12 +128,20 @@ object AetherAutoConnector {
                         "bypassedApps" to (routingPrefs.getStringSet("selected_apps", emptySet())?.toList() ?: emptyList<String>())
                     )
 
+                    var sawConnecting = false
                     lateinit var statusListener: (org.bepass.oblivion.vpn.TunnelSnapshot) -> Unit
                     statusListener = { snapshot ->
                         if (connectionGeneration.get() != generation) {
                             TunnelBus.removeStatusListener(statusListener)
                         } else {
-                            when (snapshot.stage) {
+                            if (snapshot.stage == TunnelStage.CONNECTING || snapshot.stage == TunnelStage.VALIDATING) {
+                                sawConnecting = true
+                            }
+                            if (!sawConnecting) {
+                                // TunnelBus immediately replays the previous session's snapshot on registration.
+                                // Ignore it until this attempt reports its own CONNECTING/VALIDATING stage.
+                                Unit
+                            } else when (snapshot.stage) {
                                 TunnelStage.CONNECTED -> {
                                     TunnelBus.removeStatusListener(statusListener)
                                     val prefix = if (fallbackAttempt) "تونل MASQUE در تلاش جایگزین برقرار شد." else "تونل MASQUE برقرار شد."
