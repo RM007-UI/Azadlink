@@ -135,47 +135,74 @@ object AetherAutoConnector {
                     )
 
                     var sawConnecting = false
+                    val attemptFinished = AtomicInteger(0)
                     lateinit var statusListener: (org.bepass.oblivion.vpn.TunnelSnapshot) -> Unit
+                    lateinit var watchdog: Runnable
+
+                    fun finishFailure(reason: String) {
+                        if (connectionGeneration.get() != generation || !attemptFinished.compareAndSet(0, 1)) return
+                        mainHandler.removeCallbacks(watchdog)
+                        TunnelBus.removeStatusListener(statusListener)
+                        if (!fallbackAttempt && autoFallback) {
+                            onStatusOnMain(
+                                onStatus,
+                                "$reason؛ در حال توقف تلاش فعلی و شروع اسکن جایگزین «$fallbackScanMode»…"
+                            )
+                            AetherVpnService.stop(appContext)
+                            mainHandler.postDelayed({
+                                if (connectionGeneration.get() == generation) {
+                                    startAttempt(fallbackScanMode, true)
+                                }
+                            }, 2200L)
+                        } else {
+                            AetherVpnService.stop(appContext)
+                            onStatusOnMain(
+                                onStatus,
+                                "$reason اتصال MASQUE برقرار نشد. حالت اسکن: $attemptScanMode؛ گزارش موتور را بررسی کن."
+                            )
+                        }
+                    }
+
                     statusListener = { snapshot ->
                         if (connectionGeneration.get() != generation) {
+                            mainHandler.removeCallbacks(watchdog)
                             TunnelBus.removeStatusListener(statusListener)
                         } else {
                             if (snapshot.stage == TunnelStage.CONNECTING || snapshot.stage == TunnelStage.VALIDATING) {
                                 sawConnecting = true
                             }
-                            if (!sawConnecting) {
-                                // TunnelBus immediately replays the previous session's snapshot on registration.
-                                // Ignore it until this attempt reports its own CONNECTING/VALIDATING stage.
-                                Unit
-                            } else when (snapshot.stage) {
+                            if (sawConnecting) when (snapshot.stage) {
                                 TunnelStage.CONNECTED -> {
-                                    TunnelBus.removeStatusListener(statusListener)
-                                    val prefix = if (fallbackAttempt) "تونل MASQUE در تلاش جایگزین برقرار شد." else "تونل MASQUE برقرار شد."
-                                    onStatusOnMain(onStatus, prefix + " انتقال " + transport.uppercase() + "؛ عبور داده از موتور تأیید شد.")
+                                    if (attemptFinished.compareAndSet(0, 1)) {
+                                        mainHandler.removeCallbacks(watchdog)
+                                        TunnelBus.removeStatusListener(statusListener)
+                                        val prefix = if (fallbackAttempt) "تونل MASQUE در تلاش جایگزین برقرار شد." else "تونل MASQUE برقرار شد."
+                                        onStatusOnMain(onStatus, prefix + " انتقال " + transport.uppercase() + "؛ پراکسی موتور پاسخ داد و رابط VPN برقرار شد.")
+                                    }
                                 }
                                 TunnelStage.FAILED -> {
-                                    TunnelBus.removeStatusListener(statusListener)
-                                    if (!fallbackAttempt && autoFallback && connectionGeneration.get() == generation) {
-                                        onStatusOnMain(onStatus, "اسکن " + attemptScanMode + " gateway پیدا نکرد؛ در حال شروع تلاش جایگزین با اسکن thorough…")
-                                        mainHandler.postDelayed({
-                                            if (connectionGeneration.get() == generation) {
-                                                startAttempt(fallbackScanMode, true)
-                                            }
-                                        }, 2200L)
-                                    } else {
-                                        onStatusOnMain(onStatus, "اتصال MASQUE ناموفق بود؛ گزارش موتور را باز کن. آخرین حالت اسکن: " + attemptScanMode)
-                                    }
+                                    val detail = snapshot.message?.trim()?.takeIf { it.isNotEmpty() }
+                                        ?: "هسته پس از اسکن $attemptScanMode اتصال قابل‌استفاده‌ای پیدا نکرد"
+                                    finishFailure(detail)
                                 }
                                 else -> Unit
                             }
                         }
                     }
+                    watchdog = Runnable {
+                        val timeoutSeconds = attemptTimeoutMs(attemptScanMode) / 1000L
+                        finishFailure("مهلت تلاش اسکن $attemptScanMode پس از $timeoutSeconds ثانیه تمام شد")
+                    }
                     TunnelBus.addStatusListener(statusListener)
                     try {
                         AetherVpnService.start(appContext, TunnelConfig.fromMap(settings, arguments))
+                        mainHandler.postDelayed(watchdog, attemptTimeoutMs(attemptScanMode))
                     } catch (error: Throwable) {
-                        TunnelBus.removeStatusListener(statusListener)
-                        onStatusOnMain(onStatus, "خطای اتصال: " + (error.message ?: error.javaClass.simpleName))
+                        if (attemptFinished.compareAndSet(0, 1)) {
+                            mainHandler.removeCallbacks(watchdog)
+                            TunnelBus.removeStatusListener(statusListener)
+                            onStatusOnMain(onStatus, "خطای اتصال: " + (error.message ?: error.javaClass.simpleName))
+                        }
                     }
                 }
 
@@ -189,6 +216,12 @@ object AetherAutoConnector {
     fun disconnect(context: Context) {
         connectionGeneration.incrementAndGet()
         AetherVpnService.stop(context.applicationContext)
+    }
+
+    private fun attemptTimeoutMs(scanMode: String): Long = when (scanMode.lowercase()) {
+        "thorough" -> 260_000L
+        "ironclad" -> 330_000L
+        else -> 155_000L
     }
 
     private fun hasIdentity(file: File): Boolean = runCatching {
