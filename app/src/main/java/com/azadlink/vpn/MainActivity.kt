@@ -564,7 +564,7 @@ class MainActivity : Activity() {
                 gravity = Gravity.CENTER_VERTICAL
             }
             val badge = TextView(this).apply {
-                text = "H2"
+                text = "A"
                 textSize = 12f
                 setTypeface(typeface, Typeface.BOLD)
                 gravity = Gravity.CENTER
@@ -581,7 +581,7 @@ class MainActivity : Activity() {
             }
             labelInto(miniCopy, "AETHER ENGINE", 10, Color.rgb(189, 184, 238), true)
             spaceInto(miniCopy, 3)
-            labelInto(miniCopy, "HTTP/2 · MASQUE", 13, Color.WHITE, true)
+            labelInto(miniCopy, "MASQUE · AETHER ENGINE", 13, Color.WHITE, true)
             heroTop.addView(badge)
             heroTop.addView(miniCopy)
             hero.addView(heroTop)
@@ -1155,7 +1155,18 @@ class MainActivity : Activity() {
             profileList.addView(card, params)
         }
     }
-    private fun button(title:String, action:()->Unit):Button=Button(this).apply { text=title; isAllCaps=false; setTextColor(Color.WHITE); setBackgroundColor(Color.rgb(53,112,196)); setOnClickListener { action() } }
+    private fun button(title: String, action: () -> Unit): Button = Button(this).apply {
+        text = title
+        isAllCaps = false
+        textSize = 14f
+        setTextColor(Color.WHITE)
+        minHeight = dp(44)
+        minimumHeight = dp(44)
+        setPadding(dp(12), dp(8), dp(12), dp(8))
+        background = rounded(Color.rgb(77, 63, 155), 14)
+        backgroundTintList = null
+        setOnClickListener { action() }
+    }
     private fun text(value:String,size:Int,color:Int,bold:Boolean=false):TextView=TextView(this).apply { text=value; textSize=size.toFloat(); setTextColor(color); if(bold) setTypeface(typeface,Typeface.BOLD); setPadding(0,dp(3),0,dp(3)) }
     private fun space(heightDp:Int):View=View(this).apply { layoutParams=LinearLayout.LayoutParams(1,dp(heightDp)) }
     private fun dp(value:Int):Int=(value*resources.displayMetrics.density).toInt()
