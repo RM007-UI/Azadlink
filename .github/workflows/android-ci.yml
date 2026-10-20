@@ -224,11 +224,19 @@ jobs:
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
       - name: Publish signed APK to GitHub Release
-        if: github.event_name != 'pull_request' && startsWith(github.ref, 'refs/tags/v') && steps.signing.outputs.enabled == 'true'
+        if: github.event_name != 'pull_request' && steps.signing.outputs.enabled == 'true' && (startsWith(github.ref, 'refs/tags/v') || (github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[publish-release]')))
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'v0.9.1' }}
+          target_commitish: ${{ github.sha }}
+          name: AzadLink v0.9.1
+          body: |
+            AzadLink v0.9.1 — signed Android APK.
+
+            This build includes the current Aether/Psiphon integration and the build-time compatibility check for the Psiphon protocol reported on-device. Device/network behavior can vary; test tunnel startup and traffic on your own connection.
           files: app/build/outputs/apk/release/app-release.apk
           generate_release_notes: true
+          fail_on_unmatched_files: true
       - name: Publish build summary
         if: always()
         run: |
@@ -236,6 +244,6 @@ jobs:
             echo '### AzadLink build'
             echo '- The pinned Oblivion/Aether and hev-socks5-tunnel source trees are checked out recursively and the upstream Aether Android library is included as a Gradle module.'
             echo '- Native Aether and the TUN bridge are built through the upstream Android library; app-level service adapter and live VPN traffic routing still require integration and device verification.'
-            echo '- If release-signing secrets are configured, non-PR branch builds also publish a signed APK as an Actions artifact; version tags additionally attach it to a GitHub Release.'
+            echo '- If release-signing secrets are configured, non-PR branch builds publish a signed APK as an Actions artifact; version tags or a main-branch commit explicitly marked [publish-release] attach it to a GitHub Release.'
             echo '- A successful APK build does not by itself mean the VPN tunnel works.'
           } >> "$GITHUB_STEP_SUMMARY"
