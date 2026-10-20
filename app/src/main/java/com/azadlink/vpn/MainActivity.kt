@@ -217,231 +217,318 @@ class MainActivity : Activity() {
         topStatus.text = "وضعیت: درخواست قطع اتصال ارسال شد"
     }
     private fun buildUi() {
-        val bg = Color.rgb(10, 13, 25)
-        val panel = Color.rgb(23, 29, 48)
-        val muted = Color.rgb(159, 171, 197)
-        val accent = Color.rgb(132, 103, 255)
+        val bg = Color.rgb(8, 11, 20)
+        val surface = Color.rgb(17, 23, 38)
+        val surfaceRaised = Color.rgb(24, 31, 50)
+        val accent = Color.rgb(137, 116, 255)
+        val muted = Color.rgb(151, 164, 190)
+        val mint = Color.rgb(104, 225, 190)
         window.statusBarColor = bg
         window.navigationBarColor = bg
+        window.decorView.systemUiVisibility = 0
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(bg)
         }
-        val scroll = ScrollView(this)
-        val content = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(20), dp(20), dp(20), dp(28))
-        }
-        scroll.addView(content)
-
-        val brandRow = LinearLayout(this).apply {
+        val header = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(20), dp(14), dp(16), dp(12))
         }
-        val brandMark = TextView(this).apply {
-            text = "A"
-            textSize = 22f
+        val logo = android.widget.ImageView(this).apply {
+            setImageResource(R.drawable.ic_azadlink)
+            scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+            layoutParams = LinearLayout.LayoutParams(dp(42), dp(42))
+        }
+        val brand = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(11), 0, 0, 0)
+        }
+        brand.addView(text("AzadLink", 21, Color.WHITE, true))
+        brand.addView(text("اتصال، با انتخاب خودت", 11, muted))
+        header.addView(logo)
+        header.addView(brand, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        val routingButton = TextView(this).apply {
+            text = "⚙"
+            textSize = 23f
             gravity = Gravity.CENTER
-            setTypeface(typeface, Typeface.BOLD)
             setTextColor(Color.WHITE)
-            background = rounded(accent, 16)
-            layoutParams = LinearLayout.LayoutParams(dp(48), dp(48))
+            background = rounded(surfaceRaised, 15)
+            isClickable = true
+            isFocusable = true
+            setOnClickListener { showRoutingSettings() }
+            layoutParams = LinearLayout.LayoutParams(dp(46), dp(46))
         }
-        val brandText = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(12), 0, 0, 0)
-        }
-        brandText.addView(text("AzadLink", 24, Color.WHITE, true))
-        brandText.addView(text("اتصال آزاد، انتخاب خودت", 12, muted))
-        brandRow.addView(brandMark)
-        brandRow.addView(brandText)
-        content.addView(brandRow)
-        content.addView(space(22))
+        header.addView(routingButton)
+        root.addView(header)
 
-        val hero = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(18), dp(20), dp(18), dp(18))
-            background = rounded(Color.rgb(43, 36, 77), 24)
+        val statusPanel = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(15), dp(12), dp(15), dp(12))
+            background = rounded(surface, 17)
         }
-        hero.addView(text("به اینترنتت برگرد", 24, Color.WHITE, true))
-        hero.addView(space(5))
-        hero.addView(text("موتور موردنظرت را انتخاب کن؛ وضعیت اتصال باید از خود موتور تأیید شود.", 13, Color.rgb(213, 207, 240)))
-        hero.addView(space(16))
-        topStatus = text("●  آمادهٔ اتصال", 14, Color.rgb(255, 205, 115), true)
-        topStatus.setPadding(dp(12), dp(11), dp(12), dp(11))
-        topStatus.background = rounded(Color.rgb(54, 45, 62), 13)
-        hero.addView(topStatus)
-        hero.addView(space(12))
-        val autoButton = button("اتصال خودکار · MASQUE") { requestAutoConnect() }.apply {
-            background = rounded(accent, 15)
-            textSize = 15f
-            minHeight = dp(52)
+        val statusDot = TextView(this).apply {
+            text = "●"
+            textSize = 12f
+            setTextColor(mint)
+            setPadding(0, 0, dp(9), 0)
         }
-        hero.addView(autoButton, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(52)))
-        hero.addView(space(8))
-        hero.addView(button("قطع اتصال") { disconnectVpn() }.apply {
-            background = rounded(Color.rgb(58, 43, 55), 14)
-            minHeight = dp(46)
-        })
-        hero.addView(space(7))
-        hero.addView(button("گزارش اتصال و خطاها") { showTunnelLogs() }.apply {
-            background = rounded(Color.rgb(37, 43, 65), 14)
-            minHeight = dp(44)
-        })
-        hero.addView(space(7))
-        hero.addView(button("مسیریابی برنامه‌ها و پروکسی") { showRoutingSettings() }.apply {
-            background = rounded(Color.rgb(37, 48, 70), 14)
-            minHeight = dp(44)
-        })
-        content.addView(hero)
-        content.addView(space(22))
+        topStatus = text("آمادهٔ اتصال", 13, Color.WHITE, true)
+        statusPanel.addView(statusDot)
+        statusPanel.addView(topStatus, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        val logsButton = TextView(this).apply {
+            text = "گزارش"
+            textSize = 12f
+            setTextColor(Color.rgb(198, 188, 255))
+            setPadding(dp(8), dp(5), 0, dp(5))
+            isClickable = true
+            setOnClickListener { showTunnelLogs() }
+        }
+        statusPanel.addView(logsButton)
+        val statusParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+        statusParams.setMargins(dp(16), 0, dp(16), dp(12))
+        root.addView(statusPanel, statusParams)
 
-        val groups = listOf(
-            "پروتکل‌های سروری" to listOf(Protocol.VLESS, Protocol.VMESS, Protocol.TROJAN, Protocol.SHADOWSOCKS, Protocol.WIREGUARD),
-            "تونل‌های DNS" to listOf(Protocol.MASTER_DNS, Protocol.STORM_DNS, Protocol.DNSTT),
-            "Aether و MASQUE" to listOf(Protocol.MASQUE),
-            "اتصال مستقیم" to listOf(Protocol.PSIPHON)
-        )
-        val tabSections = mutableListOf<LinearLayout>()
-        groups.forEachIndexed { tabIndex, (heading, items) ->
-            val section = LinearLayout(this).apply {
+        val scroll = ScrollView(this).apply { isFillViewport = true; clipToPadding = false }
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(18), dp(6), dp(18), dp(24))
+        }
+        scroll.addView(content)
+        val pages = mutableListOf<LinearLayout>()
+
+        fun heading(title: String, subtitle: String) {
+            content.addView(text(title, 25, Color.WHITE, true))
+            content.addView(space(5))
+            content.addView(text(subtitle, 13, muted))
+            content.addView(space(18))
+        }
+        fun sectionLabel(value: String) {
+            content.addView(text(value, 14, Color.rgb(198, 188, 255), true))
+            content.addView(space(9))
+        }
+        fun actionCard(symbol: String, title: String, subtitle: String, action: () -> Unit, tint: Int = surfaceRaised) {
+            val card = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(13), dp(13), dp(13), dp(13))
+                background = rounded(tint, 18)
+                isClickable = true
+                isFocusable = true
+                setOnClickListener { action() }
+            }
+            val mark = TextView(this).apply {
+                text = symbol
+                textSize = 20f
+                gravity = Gravity.CENTER
+                setTextColor(Color.WHITE)
+                background = rounded(Color.rgb(48, 43, 82), 14)
+                layoutParams = LinearLayout.LayoutParams(dp(46), dp(46))
+            }
+            val copy = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
-                setPadding(0, dp(5), 0, dp(5))
-                visibility = if (tabIndex == 0) View.VISIBLE else View.GONE
+                setPadding(dp(12), 0, dp(5), 0)
             }
-            section.addView(text(heading, 18, Color.rgb(207, 199, 255), true))
-            section.addView(space(7))
-            section.addView(text(
-                when (tabIndex) {
-                    0 -> "پروفایل سرورت را انتخاب کن یا کانفیگ جدید اضافه کن."
-                    1 -> "تونل‌های مبتنی بر DNS؛ برای اتصال واقعی به تنظیمات سرور نیاز دارند."
-                    2 -> "اتصال خودکار MASQUE با تنظیمات پیشرفته."
-                    else -> "اجرای مستقیم Psiphon؛ بدون واردکردن فایل کانفیگ توسط کاربر."
-                }, 12, muted
-            ))
-            section.addView(space(10))
-            items.forEach { protocol ->
-                val engine = EngineRegistry.forProtocol(protocol)
-                val card = LinearLayout(this).apply {
-                    orientation = LinearLayout.HORIZONTAL
-                    gravity = Gravity.CENTER_VERTICAL
-                    setPadding(dp(14), dp(13), dp(14), dp(13))
-                    background = rounded(panel, 17)
-                    isClickable = true
-                    isFocusable = true
-                    setOnClickListener { showProtocolDetail(protocol) }
-                }
-                val icon = TextView(this).apply {
-                    text = when (protocol) {
-                        Protocol.MASQUE -> "◈"
-                        Protocol.PSIPHON -> "✦"
-                        Protocol.VLESS -> "V"
-                        Protocol.VMESS -> "M"
-                        Protocol.TROJAN -> "T"
-                        Protocol.SHADOWSOCKS -> "S"
-                        Protocol.WIREGUARD -> "W"
-                        Protocol.MASTER_DNS -> "D"
-                        Protocol.STORM_DNS -> "ϟ"
-                        Protocol.DNSTT -> "⌁"
-                    }
-                    textSize = 19f
-                    gravity = Gravity.CENTER
-                    setTextColor(Color.WHITE)
-                    background = rounded(if (protocol == Protocol.MASQUE || protocol == Protocol.PSIPHON) Color.rgb(51, 42, 88) else Color.rgb(37, 44, 66), 13)
-                    layoutParams = LinearLayout.LayoutParams(dp(44), dp(44))
-                }
-                val labels = LinearLayout(this).apply {
-                    orientation = LinearLayout.VERTICAL
-                    setPadding(dp(11), 0, dp(4), 0)
-                }
-                labels.addView(text(protocol.displayName, 15, Color.WHITE, true))
-                labels.addView(text(engine.name, 11, muted))
-                card.addView(icon)
-                card.addView(labels, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-                card.addView(text("›", 24, muted, true))
-                val params = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
-                params.bottomMargin = dp(7)
-                section.addView(card, params)
-            }
-            content.addView(section)
-            content.addView(space(8))
-            tabSections.add(section)
+            copy.addView(text(title, 15, Color.WHITE, true))
+            copy.addView(space(3))
+            copy.addView(text(subtitle, 11, muted))
+            card.addView(mark)
+            card.addView(copy, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            card.addView(text("‹", 23, muted, true))
+            val params = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+            params.bottomMargin = dp(9)
+            content.addView(card, params)
+        }
+        fun page(build: () -> Unit) {
+            val page = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; visibility = View.GONE }
+            content.addView(page)
+            // Build each tab into its own container; only one page is visible at a time.
+            val savedParent = page.parent
+            pages.add(page)
+            val currentContent = content
+            // Temporarily direct additions to the page by moving it to the end and swapping the target.
+            val childStart = currentContent.childCount
+            build()
+            val created = (childStart until currentContent.childCount).map { currentContent.getChildAt(it) }
+            created.forEach { currentContent.removeView(it); page.addView(it) }
         }
 
-        val profileSection = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(0, dp(6), 0, dp(6))
+        page {
+            heading("پروتکل‌های سروری", "کانفیگ‌ها و اتصال‌های مبتنی بر سرور")
+            sectionLabel("انتخاب پروتکل")
+            actionCard("V", "VLESS", "سبک و مناسب کانفیگ‌های مدرن", { showProtocolDetail(Protocol.VLESS) })
+            actionCard("M", "VMess", "پروتکل مبتنی بر پروفایل", { showProtocolDetail(Protocol.VMESS) })
+            actionCard("T", "Trojan", "اتصال با پیکربندی TLS", { showProtocolDetail(Protocol.TROJAN) })
+            actionCard("S", "Shadowsocks", "پروکسی رمزگذاری‌شده", { showProtocolDetail(Protocol.SHADOWSOCKS) })
+            actionCard("W", "WireGuard", "تونل VPN مبتنی بر کلید", { showProtocolDetail(Protocol.WIREGUARD) })
+            content.addView(space(10))
+            sectionLabel("افزودن کانفیگ")
+            profileInput = EditText(this).apply {
+                hint = "لینک vless:// یا vmess:// یا کانفیگ WireGuard"
+                setHintTextColor(Color.rgb(104, 117, 145))
+                setTextColor(Color.WHITE)
+                textSize = 13f
+                minLines = 3
+                maxLines = 6
+                gravity = Gravity.TOP or Gravity.START
+                setPadding(dp(14), dp(13), dp(14), dp(13))
+                background = rounded(surface, 16)
+            }
+            content.addView(profileInput, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+            content.addView(space(9))
+            content.addView(button("تشخیص و افزودن کانفیگ") { importProfiles() }.apply {
+                background = rounded(accent, 15)
+                minHeight = dp(49)
+            })
+            content.addView(space(16))
+            sectionLabel("پروفایل‌های اضافه‌شده")
+            profileList = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+            content.addView(profileList)
         }
-        profileSection.addView(space(4))
-        profileSection.addView(text("افزودن پروفایل", 19, Color.WHITE, true))
-        profileSection.addView(space(4))
-        profileSection.addView(text("برای VLESS، VMess، Trojan، Shadowsocks و WireGuard", 12, muted))
-        profileInput = EditText(this).apply {
-            hint = "vless://… یا [Interface]…"
-            setHintTextColor(Color.rgb(111, 123, 149))
-            setTextColor(Color.WHITE)
-            textSize = 14f
-            minLines = 3
-            maxLines = 7
-            gravity = Gravity.TOP or Gravity.START
-            setPadding(dp(14), dp(13), dp(14), dp(13))
-            background = rounded(panel, 16)
+
+        page {
+            heading("تونل‌های DNS", "ابزارهای DNS در یک بخش مستقل")
+            actionCard("D", "DNSTT", "تونل DNS؛ نیازمند تنظیمات سرور", { showProtocolDetail(Protocol.DNSTT) })
+            actionCard("M", "Master DNS", "موتور مستقل MasterDNS", { showProtocolDetail(Protocol.MASTER_DNS) })
+            actionCard("ϟ", "Storm DNS", "موتور مستقل StormDNS", { showProtocolDetail(Protocol.STORM_DNS) })
+            content.addView(space(12))
+            content.addView(text("وضعیت هر موتور پس از شروع اتصال باید از خود سرویس تأیید شود؛ نمایش این کارت‌ها به‌تنهایی به معنی آماده‌بودن اتصال نیست.", 12, muted))
         }
-        profileSection.addView(space(9))
-        profileSection.addView(profileInput, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
-        profileSection.addView(space(9))
-        profileSection.addView(button("تشخیص و افزودن پروفایل") { importProfiles() }.apply {
-            background = rounded(accent, 15)
-            minHeight = dp(48)
-        })
-        profileSection.addView(space(17))
-        profileSection.addView(text("پروفایل‌های این نشست", 19, Color.WHITE, true))
-        profileSection.addView(space(8))
-        profileList = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        profileSection.addView(profileList)
-        tabSections[0].addView(profileSection)
+
+        page {
+            heading("Aether و MASQUE", "تنظیمات اتصال را با شبکهٔ خودت هماهنگ کن")
+            val hero = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(17), dp(18), dp(17), dp(17))
+                background = rounded(Color.rgb(30, 27, 57), 22)
+            }
+            hero.addView(text("اتصال خودکار MASQUE", 20, Color.WHITE, true))
+            hero.addView(space(6))
+            hero.addView(text("حالت HTTP/2 و پروفایل firewall به‌صورت پیش‌فرض انتخاب شده‌اند؛ این ترکیب در گزارش دستگاهت تونل را تأیید کرده بود.", 12, Color.rgb(193, 188, 226)))
+            hero.addView(space(14))
+            hero.addView(button("اتصال به MASQUE") { requestAutoConnect() }.apply {
+                background = rounded(accent, 15)
+                minHeight = dp(51)
+            })
+            hero.addView(space(8))
+            hero.addView(button("تنظیمات پیشرفته") { showMasqueAdvancedSettings() }.apply {
+                background = rounded(Color.rgb(49, 46, 75), 15)
+                minHeight = dp(47)
+            })
+            hero.addView(space(8))
+            hero.addView(button("قطع اتصال") { disconnectVpn() }.apply {
+                background = rounded(Color.rgb(63, 38, 53), 15)
+                minHeight = dp(45)
+            })
+            content.addView(hero)
+            content.addView(space(17))
+            sectionLabel("نکتهٔ اتصال")
+            content.addView(text("اگر اسکن پیش‌فرض gateway پیدا نکرد، ابتدا HTTP/2 را نگه دار و گزارش موتور را بررسی کن. نتیجه به شبکه و دسترسی درگاه‌ها وابسته است.", 13, muted))
+        }
+
+        page {
+            heading("Psiphon", "اتصال مستقیم؛ بدون واردکردن فایل JSON")
+            val psiphonCard = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(18), dp(19), dp(18), dp(18))
+                background = rounded(Color.rgb(26, 31, 48), 22)
+            }
+            val emblem = TextView(this).apply {
+                text = "✦"
+                textSize = 31f
+                gravity = Gravity.CENTER
+                setTextColor(Color.WHITE)
+                background = rounded(Color.rgb(63, 47, 105), 18)
+                layoutParams = LinearLayout.LayoutParams(dp(58), dp(58))
+            }
+            psiphonCard.addView(emblem)
+            psiphonCard.addView(space(12))
+            psiphonCard.addView(text("اتصال خودکار Psiphon", 20, Color.WHITE, true))
+            psiphonCard.addView(space(6))
+            psiphonCard.addView(text("نسخهٔ جدید باید با هستهٔ Psiphon سازگار ساخته شود. اگر خطا رخ دهد، از گزارش اتصال می‌توان علت دقیق را دید.", 12, muted))
+            psiphonCard.addView(space(15))
+            psiphonCard.addView(button("اتصال به Psiphon") { requestPsiphonAutoConnect() }.apply {
+                background = rounded(accent, 15)
+                minHeight = dp(51)
+            })
+            psiphonCard.addView(space(8))
+            psiphonCard.addView(button("قطع اتصال") { disconnectVpn() }.apply {
+                background = rounded(Color.rgb(63, 38, 53), 15)
+                minHeight = dp(45)
+            })
+            content.addView(psiphonCard)
+            content.addView(space(14))
+            content.addView(button("نمایش گزارش خطا") { showTunnelLogs() }.apply {
+                background = rounded(surfaceRaised, 15)
+                minHeight = dp(45)
+            })
+        }
 
         val bottomBar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
-            setPadding(dp(6), dp(7), dp(6), dp(7))
-            background = rounded(Color.rgb(17, 22, 37), 20)
+            setPadding(dp(7), dp(7), dp(7), dp(7))
+            background = rounded(Color.rgb(15, 20, 33), 21)
         }
-        val tabLabels = listOf("سرورها", "DNS", "Aether", "Psiphon")
-        val tabButtons = mutableListOf<TextView>()
+        val tabs = listOf("سرورها", "DNS", "Aether", "Psiphon")
+        val icons = listOf("⌘", "⌁", "◈", "✦")
+        val tabButtons = mutableListOf<LinearLayout>()
         fun selectTab(index: Int) {
-            tabSections.forEachIndexed { i, section -> section.visibility = if (i == index) View.VISIBLE else View.GONE }
-            tabButtons.forEachIndexed { i, button ->
-                button.setTextColor(if (i == index) Color.WHITE else muted)
-                button.background = rounded(if (i == index) Color.rgb(73, 58, 126) else Color.TRANSPARENT, 14)
-                button.animate().scaleX(if (i == index) 1.03f else 1f).scaleY(if (i == index) 1.03f else 1f).setDuration(150).start()
+            pages.forEachIndexed { i, target ->
+                if (i == index) {
+                    target.visibility = View.VISIBLE
+                    target.alpha = 0f
+                    target.translationY = dp(7).toFloat()
+                    target.animate().alpha(1f).translationY(0f).setDuration(190).start()
+                } else {
+                    target.animate().cancel()
+                    target.visibility = View.GONE
+                }
             }
-            content.animate().alpha(0.72f).setDuration(80).withEndAction {
-                content.alpha = 1f
-            }.start()
+            tabButtons.forEachIndexed { i, item ->
+                item.background = rounded(if (i == index) Color.rgb(64, 53, 105) else Color.TRANSPARENT, 15)
+                item.animate().scaleX(if (i == index) 1.04f else 1f).scaleY(if (i == index) 1.04f else 1f).setDuration(150).start()
+                val icon = item.getChildAt(0) as TextView
+                val label = item.getChildAt(1) as TextView
+                icon.setTextColor(if (i == index) Color.WHITE else muted)
+                label.setTextColor(if (i == index) Color.WHITE else muted)
+            }
         }
-        tabLabels.forEachIndexed { index, label ->
-            val tabButton = TextView(this).apply {
-                text = label
-                textSize = 12f
+        tabs.forEachIndexed { index, label ->
+            val tab = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
                 gravity = Gravity.CENTER
-                setPadding(dp(5), dp(12), dp(5), dp(12))
-                setTextColor(if (index == 0) Color.WHITE else muted)
-                background = rounded(if (index == 0) Color.rgb(73, 58, 126) else Color.TRANSPARENT, 14)
+                setPadding(dp(3), dp(7), dp(3), dp(7))
+                background = rounded(if (index == 0) Color.rgb(64, 53, 105) else Color.TRANSPARENT, 15)
                 isClickable = true
                 isFocusable = true
+                addView(TextView(this@MainActivity).apply {
+                    text = icons[index]
+                    textSize = 17f
+                    gravity = Gravity.CENTER
+                    setTextColor(if (index == 0) Color.WHITE else muted)
+                })
+                addView(TextView(this@MainActivity).apply {
+                    text = label
+                    textSize = 10f
+                    gravity = Gravity.CENTER
+                    setTextColor(if (index == 0) Color.WHITE else muted)
+                })
                 setOnClickListener { selectTab(index) }
                 layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
             }
-            tabButtons.add(tabButton)
-            bottomBar.addView(tabButton)
+            tabButtons.add(tab)
+            bottomBar.addView(tab)
         }
+
         root.addView(scroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
         val navParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
-        navParams.setMargins(dp(10), dp(4), dp(10), dp(7))
+        navParams.setMargins(dp(10), dp(5), dp(10), dp(7))
         root.addView(bottomBar, navParams)
         setContentView(root)
+        selectTab(0)
         renderProfiles()
     }
 
