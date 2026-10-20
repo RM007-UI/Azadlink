@@ -2,7 +2,9 @@
 
 AzadLink is an experimental Android VPN client integrating Aether/MASQUE, Psiphon, Xray share-link protocols, and DNS tunnel engines.
 
-## Current 0.5.0-alpha work
+## Current version: 0.9.1
+
+
 
 - Four bottom navigation sections: server protocols, DNS tunnels, Aether/MASQUE, and Psiphon.
 - MASQUE advanced options: HTTP/2 vs engine default, obfuscation profile, IP family, and TLS SNI.
@@ -22,9 +24,9 @@ A successful CI build does not prove that every protocol works on every network.
 - `AZADLINK_KEY_ALIAS`
 - `AZADLINK_KEY_PASSWORD`
 
-Keep a secure offline backup of the keystore. If it is lost, future APKs cannot use the same Android signing identity. Once these secrets are configured, push a version tag such as `v0.5.0`; CI builds the signed release APK and attaches it to the GitHub Release.
+Keep a secure offline backup of the keystore. If it is lost, future APKs cannot use the same Android signing identity. Once these secrets are configured, every non-pull-request branch build also produces a **signed release APK** as an Actions artifact. To publish a versioned public release, push a version tag such as `v0.9.1`; CI then attaches that same signed APK to the GitHub Release.
 
-The regular CI build publishes an arm64 debug APK as an Actions artifact for testing. Debug builds are not the stable signed release.
+The regular CI build also publishes an arm64 debug APK as a separate Actions artifact for testing. Debug builds are not the stable signed release.
 
 ## Build
 
