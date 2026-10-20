@@ -117,7 +117,25 @@ jobs:
           grep -Fq 'TUNNEL_PROTOCOL_FRONTED_MEEK_CDN' "$src/psiphon/common/protocol/protocol.go"
           grep -Fq 'go 1.26.0' "$src/go.mod"
           test "$(go version | awk '{print $3}')" = 'go1.26.3'
+          # Fail the build if the exact protocol reported invalid on-device is not
+          # accepted by the exact Psiphon source revision being bundled.
+          cat > "$src/verify_azadlink_protocols.go" <<'GO'
+          package main
+          import (
+            "fmt"
+            "github.com/Psiphon-Labs/psiphon-tunnel-core/psiphon/common/protocol"
+          )
+          func main() {
+            err := (protocol.TunnelProtocols{"FRONTED-MEEK-CDN-OSSH"}).Validate()
+            if err != nil { panic(err) }
+            fmt.Println("AzadLink Psiphon protocol compatibility verified")
+          }
+          GO
+          (cd "$src" && GOFLAGS=-mod=vendor go run verify_azadlink_protocols.go)
+          tls_version="$(cd "$src" && go list -m -f '{{.Version}}' github.com/Psiphon-Labs/psiphon-tls)"
+          test "$tls_version" = "v0.0.0-20260429174135-190516348878"
           mkdir -p app/src/main/jniLibs/arm64-v8a app/src/main/assets/licenses
+          printf 'Psiphon source commit: 83aa73b9b982e7421e00117f5b0c5aceb5dda452\nPsiphon TLS module: %s\nProtocol validation: passed\n' "$tls_version" > app/src/main/assets/psiphon-runtime-version.txt
           # Aether's own build script targets Linux/arm64 with pure Go (no cgo).
           # Android shares the Linux arm64 syscall ABI, and the core executes this file
           # as a child process; it is not loaded as a JNI shared library.
