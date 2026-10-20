@@ -84,7 +84,12 @@ object AetherAutoConnector {
                 val scanMode = if (automatic) "balanced" else
                     (masquePrefs.getString("scan_mode", "balanced") ?: "balanced")
                         .lowercase().let { if (it in setOf("turbo", "balanced", "thorough", "stealth", "ironclad")) it else "balanced" }
-                val fallbackScanMode = if (scanMode == "thorough") "ironclad" else "thorough"
+                val firstScanMode = if (scanMode in setOf("thorough", "stealth", "ironclad")) "turbo" else scanMode
+                val fallbackScanMode = if (firstScanMode != scanMode) scanMode else when (scanMode) {
+                    "turbo" -> "balanced"
+                    "balanced" -> "turbo"
+                    else -> "balanced"
+                }
                 val ipVersion = if (automatic) "both" else (masquePrefs.getString("ip_version", "both") ?: "both")
                 val obfuscation = if (automatic) "firewall" else (masquePrefs.getString("obfuscation", "firewall") ?: "firewall")
                 val transport = if (automatic) "h2" else if ((masquePrefs.getString("transport", "h2") ?: "h2") == "h2") "h2" else "h3"
@@ -206,7 +211,7 @@ object AetherAutoConnector {
                     }
                 }
 
-                startAttempt(scanMode, false)
+                startAttempt(firstScanMode, false)
             } catch (error: Throwable) {
                 onStatusOnMain(onStatus, "خطای اتصال: " + (error.message ?: error.javaClass.simpleName))
             }
