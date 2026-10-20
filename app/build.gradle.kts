@@ -22,8 +22,8 @@ android {
         applicationId = "com.azadlink.vpn"
         minSdk = 26
         targetSdk = 35
-        versionCode = 6
-        versionName = "0.6.0-alpha"
+        versionCode = 7
+        versionName = "0.7.0-beta"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     signingConfigs {
