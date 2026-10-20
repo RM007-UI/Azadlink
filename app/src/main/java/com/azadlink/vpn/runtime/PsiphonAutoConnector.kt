@@ -37,7 +37,7 @@ object PsiphonAutoConnector {
                 "protocol" to "masque",
                 "modeLabel" to if (chainOverMasque) "MASQUE → Psiphon" else "Psiphon",
                 "transport" to "h2",
-                "scanMode" to if (chainOverMasque) "thorough" else "balanced",
+                "scanMode" to "balanced",
                 "obfuscation" to "firewall",
                 "noizeProfile" to "firewall",
                 "ipVersion" to "both",
@@ -60,7 +60,7 @@ object PsiphonAutoConnector {
             val args = if (chainOverMasque) listOf(
                 "--bind", "127.0.0.1:1829",
                 "--http-proxy", "127.0.0.1:1830",
-                "--scan", if (chainOverMasque) "thorough" else "balanced",
+                "--scan", "balanced",
                 "--log-level", "info",
                 "--ip", "both",
                 "--validate-secs", "10",
