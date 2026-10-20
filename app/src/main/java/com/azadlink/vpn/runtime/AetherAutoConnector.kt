@@ -10,6 +10,7 @@ import org.bepass.oblivion.vpn.TunnelBus
 import org.bepass.oblivion.vpn.TunnelStage
 import java.io.File
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Starts the pinned upstream Aether MASQUE runtime.
@@ -24,7 +25,10 @@ object AetherAutoConnector {
     private const val REGISTER_TIMEOUT_MINUTES = 4L
     private val mainHandler = Handler(Looper.getMainLooper())
 
+    private val connectionGeneration = AtomicInteger(0)
+
     fun connect(context: Context, onStatus: (String) -> Unit) {
+        val generation = connectionGeneration.incrementAndGet()
         val appContext = context.applicationContext
         Thread({
             try {
@@ -65,76 +69,111 @@ object AetherAutoConnector {
                     check(process.exitValue() == 0 && hasIdentity(masqueIdentity)) {
                         val detail = runCatching { registrationLog.readLines().takeLast(8).joinToString(" | ") }
                             .getOrDefault("")
-                        "ثبت هویت MASQUE ناموفق بود. $detail"
+                        "ثبت هویت MASQUE ناموفق بود. " + detail
                     }
                 }
 
+                if (connectionGeneration.get() != generation) return@Thread
                 onStatusOnMain(onStatus, "هویت آماده است؛ در حال راه‌اندازی تونل MASQUE…")
                 val masquePrefs = appContext.getSharedPreferences("azadlink_masque", Context.MODE_PRIVATE)
                 val routingPrefs = appContext.getSharedPreferences("azadlink_routing", Context.MODE_PRIVATE)
-                val scanMode = "balanced"
+                val scanMode = (masquePrefs.getString("scan_mode", "balanced") ?: "balanced")
+                    .lowercase().let { if (it in setOf("turbo", "balanced", "thorough", "stealth", "ironclad")) it else "balanced" }
+                val fallbackScanMode = if (scanMode == "thorough") "ironclad" else "thorough"
                 val ipVersion = masquePrefs.getString("ip_version", "both") ?: "both"
                 val obfuscation = masquePrefs.getString("obfuscation", "firewall") ?: "firewall"
-                val transport = masquePrefs.getString("transport", "h2") ?: "h2"
+                val transport = if ((masquePrefs.getString("transport", "h2") ?: "h2") == "h2") "h2" else "h3"
+                val fragment = masquePrefs.getBoolean("fragment", false) && transport == "h2"
+                val autoFallback = masquePrefs.getBoolean("auto_fallback", true)
                 val masqueSni = masquePrefs.getString("sni", "www.cloudflare.com")
                     ?.trim()?.takeIf { it.isNotEmpty() } ?: "www.cloudflare.com"
-                val arguments = mutableListOf(
-                    "--bind", "127.0.0.1:$SOCKS_PORT",
-                    "--http-proxy", "127.0.0.1:$HTTP_PORT",
-                    "--scan", scanMode,
-                    "--log-level", "info",
-                    "--ip", ipVersion,
-                    "--validate-secs", "10",
-                    "--reconnect-secs", "2",
-                    "--noize", obfuscation,
-                    "--masque",
-                    "--masque-sni", masqueSni
-                )
-                if (transport == "h2") arguments.add("--h2")
-                val settings = mapOf<String, Any?>(
-                    "protocol" to "masque",
-                    "modeLabel" to "MASQUE ${transport.uppercase()}",
-                    "transport" to transport,
-                    "scanMode" to scanMode,
-                    "obfuscation" to obfuscation,
-                    "noizeProfile" to obfuscation,
-                    "ipVersion" to ipVersion,
-                    "logLevel" to "info",
-                    "endpoint" to "",
-                    "socksPort" to SOCKS_PORT,
-                    "tunnelMtu" to 1500,
-                    "coreMtu" to 0,
-                    "allowLan" to false,
-                    "proxyOnly" to routingPrefs.getBoolean("proxy_only", false),
-                    "quickReconnect" to true,
-                    "dnsPrimary" to "1.1.1.1",
-                    "dnsSecondary" to "1.0.0.1",
-                    "splitTunnelMode" to (routingPrefs.getString("split_mode", "disabled") ?: "disabled"),
-                    "bypassedApps" to (routingPrefs.getStringSet("selected_apps", emptySet())?.toList() ?: emptyList<String>())
-                )
-                lateinit var statusListener: (org.bepass.oblivion.vpn.TunnelSnapshot) -> Unit
-                statusListener = { snapshot ->
-                    when (snapshot.stage) {
-                        TunnelStage.CONNECTED -> {
+
+                fun startAttempt(attemptScanMode: String, fallbackAttempt: Boolean) {
+                    if (connectionGeneration.get() != generation) return
+                    val arguments = mutableListOf(
+                        "--bind", "127.0.0.1:" + SOCKS_PORT,
+                        "--http-proxy", "127.0.0.1:" + HTTP_PORT,
+                        "--scan", attemptScanMode,
+                        "--log-level", "info",
+                        "--ip", ipVersion,
+                        "--validate-secs", "10",
+                        "--reconnect-secs", "2",
+                        "--noize", obfuscation,
+                        "--masque",
+                        "--masque-sni", masqueSni
+                    )
+                    if (transport == "h2") arguments.add("--h2")
+                    if (fragment) arguments.add("--fragment")
+
+                    val settings = mapOf<String, Any?>(
+                        "protocol" to "masque",
+                        "modeLabel" to ("MASQUE " + transport.uppercase()),
+                        "transport" to transport,
+                        "scanMode" to attemptScanMode,
+                        "obfuscation" to obfuscation,
+                        "noizeProfile" to obfuscation,
+                        "ipVersion" to ipVersion,
+                        "logLevel" to "info",
+                        "endpoint" to "",
+                        "socksPort" to SOCKS_PORT,
+                        "tunnelMtu" to 1500,
+                        "coreMtu" to 0,
+                        "fragment" to fragment,
+                        "allowLan" to false,
+                        "proxyOnly" to routingPrefs.getBoolean("proxy_only", false),
+                        "quickReconnect" to true,
+                        "dnsPrimary" to "1.1.1.1",
+                        "dnsSecondary" to "1.0.0.1",
+                        "splitTunnelMode" to (routingPrefs.getString("split_mode", "disabled") ?: "disabled"),
+                        "bypassedApps" to (routingPrefs.getStringSet("selected_apps", emptySet())?.toList() ?: emptyList<String>())
+                    )
+
+                    lateinit var statusListener: (org.bepass.oblivion.vpn.TunnelSnapshot) -> Unit
+                    statusListener = { snapshot ->
+                        if (connectionGeneration.get() != generation) {
                             TunnelBus.removeStatusListener(statusListener)
-                            onStatusOnMain(onStatus, "تونل MASQUE با HTTP/2 برقرار شد.")
+                        } else {
+                            when (snapshot.stage) {
+                                TunnelStage.CONNECTED -> {
+                                    TunnelBus.removeStatusListener(statusListener)
+                                    val prefix = if (fallbackAttempt) "تونل MASQUE در تلاش جایگزین برقرار شد." else "تونل MASQUE برقرار شد."
+                                    onStatusOnMain(onStatus, prefix + " انتقال " + transport.uppercase() + "؛ عبور داده از موتور تأیید شد.")
+                                }
+                                TunnelStage.FAILED -> {
+                                    TunnelBus.removeStatusListener(statusListener)
+                                    if (!fallbackAttempt && autoFallback && connectionGeneration.get() == generation) {
+                                        onStatusOnMain(onStatus, "اسکن " + attemptScanMode + " gateway پیدا نکرد؛ در حال شروع تلاش جایگزین با اسکن thorough…")
+                                        mainHandler.postDelayed({
+                                            if (connectionGeneration.get() == generation) {
+                                                startAttempt(fallbackScanMode, true)
+                                            }
+                                        }, 2200L)
+                                    } else {
+                                        onStatusOnMain(onStatus, "اتصال MASQUE ناموفق بود؛ گزارش موتور را باز کن. آخرین حالت اسکن: " + attemptScanMode)
+                                    }
+                                }
+                                else -> Unit
+                            }
                         }
-                        TunnelStage.FAILED -> {
-                            TunnelBus.removeStatusListener(statusListener)
-                            onStatusOnMain(onStatus, "اتصال MASQUE با HTTP/2 ناموفق بود؛ گزارش اتصال را برای بررسی خطای موتور باز کن.")
-                        }
-                        else -> Unit
+                    }
+                    TunnelBus.addStatusListener(statusListener)
+                    try {
+                        AetherVpnService.start(appContext, TunnelConfig.fromMap(settings, arguments))
+                    } catch (error: Throwable) {
+                        TunnelBus.removeStatusListener(statusListener)
+                        onStatusOnMain(onStatus, "خطای اتصال: " + (error.message ?: error.javaClass.simpleName))
                     }
                 }
-                AetherVpnService.start(appContext, TunnelConfig.fromMap(settings, arguments))
-                TunnelBus.addStatusListener(statusListener)
+
+                startAttempt(scanMode, false)
             } catch (error: Throwable) {
-                onStatusOnMain(onStatus, "خطای اتصال: ${error.message ?: error.javaClass.simpleName}")
+                onStatusOnMain(onStatus, "خطای اتصال: " + (error.message ?: error.javaClass.simpleName))
             }
         }, "azadlink-aether-connect").start()
     }
 
     fun disconnect(context: Context) {
+        connectionGeneration.incrementAndGet()
         AetherVpnService.stop(context.applicationContext)
     }
 
