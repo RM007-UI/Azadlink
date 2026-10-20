@@ -77,17 +77,22 @@ object AetherAutoConnector {
                 onStatusOnMain(onStatus, "هویت آماده است؛ در حال راه‌اندازی تونل MASQUE…")
                 val masquePrefs = appContext.getSharedPreferences("azadlink_masque", Context.MODE_PRIVATE)
                 val routingPrefs = appContext.getSharedPreferences("azadlink_routing", Context.MODE_PRIVATE)
-                val scanMode = (masquePrefs.getString("scan_mode", "balanced") ?: "balanced")
-                    .lowercase().let { if (it in setOf("turbo", "balanced", "thorough", "stealth", "ironclad")) it else "balanced" }
+                // New installs and Auto/Default presets prefer the known-good HTTP/2 path.
+                // Respect explicit advanced choices only when the user selected Manual mode.
+                val connectionMode = masquePrefs.getString("connection_mode", "auto") ?: "auto"
+                val automatic = connectionMode != "manual"
+                val scanMode = if (automatic) "balanced" else
+                    (masquePrefs.getString("scan_mode", "balanced") ?: "balanced")
+                        .lowercase().let { if (it in setOf("turbo", "balanced", "thorough", "stealth", "ironclad")) it else "balanced" }
                 val fallbackScanMode = if (scanMode == "thorough") "ironclad" else "thorough"
-                val ipVersion = masquePrefs.getString("ip_version", "both") ?: "both"
-                val obfuscation = masquePrefs.getString("obfuscation", "firewall") ?: "firewall"
-                val transport = if ((masquePrefs.getString("transport", "h2") ?: "h2") == "h2") "h2" else "h3"
-                val fragment = masquePrefs.getBoolean("fragment", false) && transport == "h2"
-                val autoFallback = masquePrefs.getBoolean("auto_fallback", true)
-                val masqueSni = masquePrefs.getString("sni", "www.cloudflare.com")
-                    ?.trim()?.takeIf { it.isNotEmpty() } ?: "www.cloudflare.com"
-                val manualEndpoint = masquePrefs.getString("endpoint", "")?.trim().orEmpty()
+                val ipVersion = if (automatic) "both" else (masquePrefs.getString("ip_version", "both") ?: "both")
+                val obfuscation = if (automatic) "firewall" else (masquePrefs.getString("obfuscation", "firewall") ?: "firewall")
+                val transport = if (automatic) "h2" else if ((masquePrefs.getString("transport", "h2") ?: "h2") == "h2") "h2" else "h3"
+                val fragment = !automatic && masquePrefs.getBoolean("fragment", false) && transport == "h2"
+                val autoFallback = connectionMode == "auto" || masquePrefs.getBoolean("auto_fallback", true)
+                val masqueSni = if (automatic) "www.cloudflare.com" else
+                    (masquePrefs.getString("sni", "www.cloudflare.com")?.trim()?.takeIf { it.isNotEmpty() } ?: "www.cloudflare.com")
+                val manualEndpoint = if (automatic) "" else masquePrefs.getString("endpoint", "")?.trim().orEmpty()
 
                 fun startAttempt(attemptScanMode: String, fallbackAttempt: Boolean) {
                     if (connectionGeneration.get() != generation) return
