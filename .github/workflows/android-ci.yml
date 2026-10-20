@@ -225,7 +225,7 @@ jobs:
           if-no-files-found: error
       # One-time main-branch publishing is triggered by a commit message containing [publish-release].
       - name: Publish signed APK to GitHub Release
-        if: github.event_name != 'pull_request' && steps.signing.outputs.enabled == 'true' && (startsWith(github.ref, 'refs/tags/v') || (github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[publish-release]')))
+        if: github.event_name != 'pull_request' && startsWith(github.ref, 'refs/tags/v') && steps.signing.outputs.enabled == 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'v0.9.1' }}
@@ -248,3 +248,48 @@ jobs:
             echo '- If release-signing secrets are configured, non-PR branch builds publish a signed APK as an Actions artifact; version tags or a main-branch commit explicitly marked [publish-release] attach it to a GitHub Release.'
             echo '- A successful APK build does not by itself mean the VPN tunnel works.'
           } >> "$GITHUB_STEP_SUMMARY"
+
+  # For this one-time publication, reuse the signed APK from the latest successful build.
+  # The Android source has not changed since that build; only this workflow has changed.
+  publish-prebuilt-release:
+    if: github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[publish-release]')
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - name: Download signed APK from the verified successful build
+        uses: actions/download-artifact@v4
+        with:
+          name: azadlink-release-apk
+          repository: ${{ github.repository }}
+          run-id: 39428368819
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: incoming
+      - name: Prepare public release assets and checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+          apk="$(find incoming -type f -name '*.apk' -print -quit)"
+          test -n "$apk"
+          cp "$apk" release-assets/AzadLink-v0.9.1.apk
+          (cd release-assets && sha256sum AzadLink-v0.9.1.apk > SHA256SUMS.txt)
+          ls -lh release-assets
+      - name: Publish signed APK to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v0.9.1
+          target_commitish: ${{ github.sha }}
+          name: AzadLink v0.9.1
+          body: |
+            AzadLink v0.9.1 — signed Android APK.
+
+            This release reuses the signed APK from successful CI run 39428368819. The Android source is unchanged from that build; this publication updates release availability and includes a SHA-256 checksum.
+
+            Device-level testing is still required. A successful APK build alone does not guarantee every protocol or network will work.
+          files: |
+            release-assets/AzadLink-v0.9.1.apk
+            release-assets/SHA256SUMS.txt
+          generate_release_notes: true
+          fail_on_unmatched_files: true
