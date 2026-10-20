@@ -1082,6 +1082,7 @@ class MainActivity : Activity() {
                 }
                 val ip = when (ipSpinner.selectedItemPosition) { 1 -> "v4"; 2 -> "v6"; else -> "both" }
                 prefs.edit()
+                    .putString("connection_mode", "manual")
                     .putString("transport", if (transportSpinner.selectedItemPosition == 0) "h2" else "h3")
                     .putString("scan_mode", scanModes[scanSpinner.selectedItemPosition])
                     .putString("obfuscation", noiseModes[noiseSpinner.selectedItemPosition])
