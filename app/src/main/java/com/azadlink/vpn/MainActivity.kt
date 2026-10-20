@@ -521,7 +521,7 @@ class MainActivity : Activity() {
             spaceInto(page, 9)
             actionButton(page, "＋   تشخیص و افزودن کانفیگ", accent, { importProfiles() }, 49)
             spaceInto(page, 20)
-            sectionTitle(page, "پروفایل‌های من", "پروفایل‌های اضافه‌شده در همین نشست")
+            sectionTitle(page, "پروفایل‌های من", "پروفایل‌های ذخیره‌شده روی همین دستگاه")
             profileList = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
             page.addView(profileList)
             spaceInto(page, 10)
@@ -959,6 +959,14 @@ class MainActivity : Activity() {
             .setView(ScrollView(this).apply { addView(panel) })
             .setNegativeButton("لغو", null)
             .setPositiveButton("ذخیره") { _, _ ->
+                val endpointValue = endpointInput.text?.toString()?.trim().orEmpty()
+                if (endpointValue.isNotBlank()) {
+                    val endpointPort = endpointValue.substringAfterLast(':', "").toIntOrNull()
+                    if (!endpointValue.contains(':') || endpointPort == null || endpointPort !in 1..65535 || endpointValue.any { it.isWhitespace() }) {
+                        Toast.makeText(this, "درگاه باید به شکل host:port باشد؛ مثلاً 162.159.198.64:443", Toast.LENGTH_LONG).show()
+                        return@setPositiveButton
+                    }
+                }
                 val ip = when (ipSpinner.selectedItemPosition) { 1 -> "v4"; 2 -> "v6"; else -> "both" }
                 prefs.edit()
                     .putString("transport", if (transportSpinner.selectedItemPosition == 0) "h2" else "h3")
@@ -966,7 +974,7 @@ class MainActivity : Activity() {
                     .putString("obfuscation", noiseModes[noiseSpinner.selectedItemPosition])
                     .putString("ip_version", ip)
                     .putString("sni", sniInput.text?.toString()?.trim()?.takeIf { it.isNotBlank() } ?: "www.cloudflare.com")
-                    .putString("endpoint", endpointInput.text?.toString()?.trim()?.takeIf { it.isNotBlank() } ?: "")
+                    .putString("endpoint", endpointValue)
                     .putBoolean("fragment", fragmentCheck.isChecked)
                     .putBoolean("auto_fallback", fallbackCheck.isChecked)
                     .apply()
