@@ -35,6 +35,8 @@ import com.azadlink.vpn.runtime.AetherAutoConnector
 import org.bepass.oblivion.vpn.TunnelBus
 import org.bepass.oblivion.vpn.TunnelSnapshot
 import org.bepass.oblivion.vpn.TunnelStage
+import org.json.JSONArray
+import org.json.JSONObject
 
 class MainActivity : Activity() {
     private val profiles = mutableListOf<ProtocolProfile>()
@@ -73,6 +75,7 @@ class MainActivity : Activity() {
         window.statusBarColor = Color.rgb(12, 17, 28)
         window.navigationBarColor = Color.rgb(12, 17, 28)
         window.decorView.systemUiVisibility = 0
+        loadProfiles()
         buildUi()
         refreshState()
     }
@@ -1018,24 +1021,138 @@ class MainActivity : Activity() {
         setColor(color)
         cornerRadius = dp(radius).toFloat()
     }
+    private fun loadProfiles() {
+        profiles.clear()
+        val saved = getSharedPreferences("azadlink_profiles", MODE_PRIVATE)
+            .getString("items", "[]").orEmpty()
+        runCatching {
+            val array = JSONArray(saved)
+            for (index in 0 until array.length()) {
+                val item = array.optJSONObject(index) ?: continue
+                val protocol = runCatching { Protocol.valueOf(item.optString("protocol")) }.getOrNull() ?: continue
+                val raw = item.optString("rawConfig")
+                if (raw.isBlank()) continue
+                val label = item.optString("label").ifBlank { protocol.displayName }
+                profiles.add(ProtocolProfile(protocol = protocol, label = label, rawConfig = raw))
+            }
+        }.onFailure {
+            profiles.clear()
+        }
+    }
+
+    private fun saveProfiles() {
+        val array = JSONArray()
+        profiles.forEach { profile ->
+            array.put(
+                JSONObject()
+                    .put("protocol", profile.protocol.name)
+                    .put("label", profile.label)
+                    .put("rawConfig", profile.rawConfig)
+            )
+        }
+        getSharedPreferences("azadlink_profiles", MODE_PRIVATE)
+            .edit().putString("items", array.toString()).apply()
+    }
+
     private fun importProfiles() {
-        val result=ProtocolParser.parse(profileInput.text?.toString().orEmpty()); var added=0
-        result.profiles.forEach { if (profiles.none { p -> p.rawConfig==it.rawConfig }) { profiles+=it; added++ } }
+        val result = ProtocolParser.parse(profileInput.text?.toString().orEmpty())
+        var added = 0
+        result.profiles.forEach { candidate ->
+            if (profiles.none { existing -> existing.rawConfig == candidate.rawConfig }) {
+                profiles.add(candidate)
+                added++
+            }
+        }
+        if (added > 0) saveProfiles()
         renderProfiles()
-        Toast.makeText(this,"شناسایی شد: ${result.profiles.size} · جدید: $added · ناشناخته: ${result.rejectedLines.size}",Toast.LENGTH_LONG).show()
+        Toast.makeText(
+            this,
+            "شناسایی شد: " + result.profiles.size + " · جدید: " + added + " · ناشناخته: " + result.rejectedLines.size,
+            Toast.LENGTH_LONG
+        ).show()
     }
     private fun renderProfiles() {
         profileList.removeAllViews()
-        if (profiles.isEmpty()) { profileList.addView(text("هنوز کانفیگی اضافه نشده.",13,Color.rgb(155,174,200))); return }
-        profiles.forEach { profile ->
-            val engine=EngineRegistry.forProtocol(profile.protocol)
-            val card=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; setPadding(dp(12),dp(10),dp(12),dp(10)); setBackgroundColor(Color.rgb(24,33,49)) }
-            card.addView(text(profile.label,16,Color.WHITE,true))
-            card.addView(text("${profile.protocol.displayName} · شناسایی موفق",12,Color.rgb(129,212,170)))
-            card.addView(text("موتور لازم: ${engine.name}",12,Color.rgb(155,174,200)))
-            card.addView(text("${engine.detail}\nکانفیگ فقط در حافظهٔ همین صفحه نگه داشته می‌شود.",12,Color.rgb(255,213,128)))
-            card.addView(button("آماده‌سازی اتصال ${profile.protocol.displayName}") { requestConnect(profile) })
-            val params=LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT); params.bottomMargin=dp(8); profileList.addView(card,params)
+        if (profiles.isEmpty()) {
+            val empty = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER
+                setPadding(dp(16), dp(22), dp(16), dp(22))
+                background = rounded(Color.rgb(17, 23, 38), 18)
+            }
+            empty.addView(text("هنوز پروفایلی اضافه نشده", 14, Color.WHITE, true))
+            empty.addView(text("لینک سرور را بالا وارد کن.", 12, Color.rgb(152, 166, 192)))
+            profileList.addView(empty)
+            return
+        }
+        profiles.toList().forEach { profile ->
+            val engine = EngineRegistry.forProtocol(profile.protocol)
+            val card = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(13), dp(12), dp(13), dp(12))
+                background = GradientDrawable().apply {
+                    setColor(Color.rgb(20, 28, 45))
+                    cornerRadius = dp(18).toFloat()
+                    setStroke(dp(1), Color.rgb(43, 54, 76))
+                }
+                elevation = dp(1).toFloat()
+            }
+            val top = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+            }
+            val mark = TextView(this).apply {
+                text = profile.protocol.displayName.take(1)
+                textSize = 16f
+                setTypeface(typeface, Typeface.BOLD)
+                gravity = Gravity.CENTER
+                setTextColor(Color.WHITE)
+                background = rounded(Color.rgb(75, 64, 134), 13)
+                layoutParams = LinearLayout.LayoutParams(dp(41), dp(41))
+            }
+            val copy = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(10), 0, 0, 0)
+            }
+            copy.addView(text(profile.label, 15, Color.WHITE, true))
+            copy.addView(text(profile.protocol.displayName + " · پروفایل ذخیره‌شده", 11, Color.rgb(135, 218, 184)))
+            top.addView(mark)
+            top.addView(copy, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            val delete = TextView(this).apply {
+                text = "×"
+                textSize = 25f
+                gravity = Gravity.CENTER
+                setTextColor(Color.rgb(232, 151, 164))
+                background = rounded(Color.rgb(55, 35, 50), 12)
+                layoutParams = LinearLayout.LayoutParams(dp(39), dp(39))
+                isClickable = true
+                setOnClickListener {
+                    AlertDialog.Builder(this@MainActivity)
+                        .setTitle("حذف پروفایل")
+                        .setMessage("پروفایل «" + profile.label + "» از حافظهٔ برنامه حذف شود؟")
+                        .setNegativeButton("لغو", null)
+                        .setPositiveButton("حذف") { _, _ ->
+                            profiles.removeAll { it.id == profile.id || it.rawConfig == profile.rawConfig }
+                            saveProfiles()
+                            renderProfiles()
+                        }
+                        .show()
+                }
+            }
+            top.addView(delete)
+            card.addView(top)
+            card.addView(space(8))
+            card.addView(text("موتور: " + engine.name, 11, Color.rgb(152, 166, 192)))
+            card.addView(space(10))
+            val connectButton = button("اتصال با این پروفایل") { requestConnect(profile) }.apply {
+                background = rounded(Color.rgb(81, 65, 164), 13)
+                backgroundTintList = null
+                minHeight = dp(44)
+            }
+            card.addView(connectButton)
+            val params = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+            params.bottomMargin = dp(10)
+            profileList.addView(card, params)
         }
     }
     private fun button(title:String, action:()->Unit):Button=Button(this).apply { text=title; isAllCaps=false; setTextColor(Color.WHITE); setBackgroundColor(Color.rgb(53,112,196)); setOnClickListener { action() } }
