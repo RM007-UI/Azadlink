@@ -190,13 +190,13 @@ object AetherAutoConnector {
                         }
                     }
                     watchdog = Runnable {
-                        val timeoutSeconds = attemptTimeoutMs(attemptScanMode) / 1000L
+                        val timeoutSeconds = attemptTimeoutMs(attemptScanMode, fallbackAttempt, automatic) / 1000L
                         finishFailure("مهلت تلاش اسکن $attemptScanMode پس از $timeoutSeconds ثانیه تمام شد")
                     }
                     TunnelBus.addStatusListener(statusListener)
                     try {
                         AetherVpnService.start(appContext, TunnelConfig.fromMap(settings, arguments))
-                        mainHandler.postDelayed(watchdog, attemptTimeoutMs(attemptScanMode))
+                        mainHandler.postDelayed(watchdog, attemptTimeoutMs(attemptScanMode, fallbackAttempt, automatic))
                     } catch (error: Throwable) {
                         if (attemptFinished.compareAndSet(0, 1)) {
                             mainHandler.removeCallbacks(watchdog)
@@ -218,10 +218,18 @@ object AetherAutoConnector {
         AetherVpnService.stop(context.applicationContext)
     }
 
-    private fun attemptTimeoutMs(scanMode: String): Long = when (scanMode.lowercase()) {
-        "thorough" -> 260_000L
-        "ironclad" -> 330_000L
-        else -> 155_000L
+    private fun attemptTimeoutMs(scanMode: String, fallbackAttempt: Boolean, automatic: Boolean): Long {
+        // Let the first automatic balanced scan fail fast, but don't interrupt a user's
+        // explicitly selected scan or the thorough fallback before Aether's own budget ends.
+        if (automatic && !fallbackAttempt && scanMode.equals("balanced", ignoreCase = true)) {
+            return 155_000L
+        }
+        return when (scanMode.trim().lowercase()) {
+            "turbo", "fast" -> 115_000L
+            "thorough", "deep", "pro" -> 370_000L
+            "stealth", "quiet", "ironclad", "real", "verify", "guaranteed" -> 250_000L
+            else -> 190_000L
+        }
     }
 
     private fun hasIdentity(file: File): Boolean = runCatching {
