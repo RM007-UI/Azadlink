@@ -858,23 +858,36 @@ class MainActivity : Activity() {
                     android.R.layout.simple_spinner_dropdown_item,
                     items
                 )
-                setSelection(selected)
+                setSelection(selected.coerceIn(0, items.lastIndex))
             }
         }
-        addLabel("انتقال")
+
+        addLabel("انتقال MASQUE")
         val transportSpinner = spinner(
-            listOf("HTTP/2 · پیشنهادشده برای شبکهٔ من", "حالت پیش‌فرض موتور"),
+            listOf("HTTP/2 · مناسب شبکه‌های محدود", "HTTP/3 · حالت سریع‌تر"),
             if ((prefs.getString("transport", "h2") ?: "h2") == "h2") 0 else 1
         )
         panel.addView(transportSpinner)
         panel.addView(space(10))
-        addLabel("الگوی عبور از محدودیت")
-        val noiseSpinner = spinner(
-            listOf("firewall", "balanced"),
-            if ((prefs.getString("obfuscation", "firewall") ?: "firewall") == "firewall") 0 else 1
-        )
+
+        addLabel("حالت اسکن gateway")
+        val scanModes = listOf("turbo", "balanced", "thorough", "stealth", "ironclad")
+        val currentScan = prefs.getString("scan_mode", "balanced") ?: "balanced"
+        val scanSpinner = spinner(scanModes, scanModes.indexOf(currentScan))
+        panel.addView(scanSpinner)
+        panel.addView(text(
+            "turbo سریع‌تر است؛ balanced متعادل است؛ thorough محدودهٔ بیشتری را بررسی می‌کند؛ stealth آهسته‌تر است؛ ironclad برای بررسی سخت‌گیرانه‌تر طراحی شده است.",
+            11, Color.rgb(159, 171, 197)
+        ))
+        panel.addView(space(10))
+
+        addLabel("پروفایل استتار")
+        val noiseModes = listOf("firewall", "gfw", "off")
+        val currentNoise = prefs.getString("obfuscation", "firewall") ?: "firewall"
+        val noiseSpinner = spinner(noiseModes, noiseModes.indexOf(currentNoise))
         panel.addView(noiseSpinner)
         panel.addView(space(10))
+
         addLabel("نسخهٔ IP")
         val ipSpinner = spinner(
             listOf("دوگانه · IPv4 + IPv6", "فقط IPv4", "فقط IPv6"),
@@ -882,6 +895,7 @@ class MainActivity : Activity() {
         )
         panel.addView(ipSpinner)
         panel.addView(space(10))
+
         addLabel("نام سرور TLS (SNI)")
         val sniInput = EditText(this).apply {
             setSingleLine(true)
@@ -894,22 +908,45 @@ class MainActivity : Activity() {
             background = rounded(Color.rgb(23, 29, 48), 12)
         }
         panel.addView(sniInput)
+        panel.addView(space(6))
+
+        val fragmentCheck = android.widget.CheckBox(this).apply {
+            text = "فرگمنت ClientHello (فقط در HTTP/2)"
+            textSize = 12f
+            setTextColor(Color.WHITE)
+            buttonTintList = android.content.res.ColorStateList.valueOf(Color.rgb(132, 103, 255))
+            isChecked = prefs.getBoolean("fragment", false)
+        }
+        panel.addView(fragmentCheck)
+        panel.addView(space(3))
+
+        val fallbackCheck = android.widget.CheckBox(this).apply {
+            text = "اگر اسکن شکست خورد، یک بار با اسکن عمیق‌تر تلاش کن"
+            textSize = 12f
+            setTextColor(Color.WHITE)
+            buttonTintList = android.content.res.ColorStateList.valueOf(Color.rgb(132, 103, 255))
+            isChecked = prefs.getBoolean("auto_fallback", true)
+        }
+        panel.addView(fallbackCheck)
         panel.addView(space(8))
         panel.addView(text(
-            "تنظیمات پس از ذخیره‌شدن روی اتصال بعدی اعمال می‌شوند. موفقیت اتصال به شبکه و درگاه قابل‌دسترسی هم بستگی دارد.",
-            12, Color.rgb(159, 171, 197)
+            "تلاش جایگزین ممکن است چند دقیقه طول بکشد و موفقیت اتصال را تضمین نمی‌کند. تنظیمات فقط روی اتصال بعدی اعمال می‌شوند.",
+            11, Color.rgb(159, 171, 197)
         ))
         AlertDialog.Builder(this)
             .setTitle("تنظیمات پیشرفتهٔ MASQUE")
-            .setView(panel)
+            .setView(ScrollView(this).apply { addView(panel) })
             .setNegativeButton("لغو", null)
             .setPositiveButton("ذخیره") { _, _ ->
                 val ip = when (ipSpinner.selectedItemPosition) { 1 -> "v4"; 2 -> "v6"; else -> "both" }
                 prefs.edit()
-                    .putString("transport", if (transportSpinner.selectedItemPosition == 0) "h2" else "default")
-                    .putString("obfuscation", if (noiseSpinner.selectedItemPosition == 0) "firewall" else "balanced")
+                    .putString("transport", if (transportSpinner.selectedItemPosition == 0) "h2" else "h3")
+                    .putString("scan_mode", scanModes[scanSpinner.selectedItemPosition])
+                    .putString("obfuscation", noiseModes[noiseSpinner.selectedItemPosition])
                     .putString("ip_version", ip)
                     .putString("sni", sniInput.text?.toString()?.trim()?.takeIf { it.isNotBlank() } ?: "www.cloudflare.com")
+                    .putBoolean("fragment", fragmentCheck.isChecked)
+                    .putBoolean("auto_fallback", fallbackCheck.isChecked)
                     .apply()
                 Toast.makeText(this, "تنظیمات MASQUE ذخیره شد؛ برای اعمال، دوباره وصل شو.", Toast.LENGTH_LONG).show()
             }
