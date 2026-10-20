@@ -224,9 +224,29 @@ jobs:
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
       - name: Publish signed APK to GitHub Release
-        if: github.event_name != 'pull_request' && startsWith(github.ref, 'refs/tags/v') && steps.signing.outputs.enabled == 'true'
+        if: >-
+          github.event_name != 'pull_request' &&
+          steps.signing.outputs.enabled == 'true' &&
+          (
+            startsWith(github.ref, 'refs/tags/v') ||
+            (
+              github.ref == 'refs/heads/feature/aether-masque-autoconnect' &&
+              github.event_name == 'push' &&
+              github.event.head_commit.message == 'Publish AzadLink v0.9.2 release'
+            )
+          )
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'v0.9.2' }}
+          target_commitish: ${{ github.sha }}
+          prerelease: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+          name: AzadLink v0.9.2
+          body: |
+            AzadLink v0.9.2 release candidate.
+
+            Includes a pinned Psiphon ConsoleClient build and a CI check for the previously reported FRONTED-MEEK-CDN-OSSH protocol error. MASQUE HTTP/2 support is included.
+
+            This APK passed CI build and unit tests. Device-level verification of all VPN modes is still required; report any connection failures with the in-app logs.
           files: app/build/outputs/apk/release/app-release.apk
           generate_release_notes: true
       - name: Publish build summary
