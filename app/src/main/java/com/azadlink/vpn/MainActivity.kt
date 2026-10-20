@@ -678,9 +678,9 @@ class MainActivity : Activity() {
                     .putString("sni", "www.cloudflare.com")
                     .putString("endpoint", "")
                     .putBoolean("fragment", false)
-                    .putBoolean("auto_fallback", false)
+                    .putBoolean("auto_fallback", true)
                     .apply()
-                Toast.makeText(this, "تنظیمات پیش‌فرض MASQUE فعال شد (HTTP/2).", Toast.LENGTH_LONG).show()
+                Toast.makeText(this, "تنظیمات پیش‌فرض MASQUE فعال شد (HTTP/2 + تلاش جایگزین).", Toast.LENGTH_LONG).show()
             }, 43)
             spaceInto(hero, 7)
             actionButton(hero, "تنظیم خودکار", Color.rgb(44, 105, 105), {
