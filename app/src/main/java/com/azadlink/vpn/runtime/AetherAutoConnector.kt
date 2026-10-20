@@ -87,6 +87,7 @@ object AetherAutoConnector {
                 val autoFallback = masquePrefs.getBoolean("auto_fallback", true)
                 val masqueSni = masquePrefs.getString("sni", "www.cloudflare.com")
                     ?.trim()?.takeIf { it.isNotEmpty() } ?: "www.cloudflare.com"
+                val manualEndpoint = masquePrefs.getString("endpoint", "")?.trim().orEmpty()
 
                 fun startAttempt(attemptScanMode: String, fallbackAttempt: Boolean) {
                     if (connectionGeneration.get() != generation) return
@@ -114,7 +115,7 @@ object AetherAutoConnector {
                         "noizeProfile" to obfuscation,
                         "ipVersion" to ipVersion,
                         "logLevel" to "info",
-                        "endpoint" to "",
+                        "endpoint" to if (fallbackAttempt) "" else manualEndpoint,
                         "socksPort" to SOCKS_PORT,
                         "tunnelMtu" to 1500,
                         "coreMtu" to 0,
