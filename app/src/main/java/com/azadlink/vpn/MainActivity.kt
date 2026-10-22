@@ -1175,25 +1175,102 @@ class MainActivity : Activity() {
     }
 
     private fun showAppDrawer() {
-        val options = arrayOf(
-            "مسیریابی برنامه‌ها  ·  انتخاب برنامه‌های عبوری از تونل",
-            "حالت پراکسی  ·  تنظیم جداگانه",
-            "انتخاب پروتکل اتصال",
-            "تنظیمات و ظاهر برنامه",
-            "گزارش موتور و خطاها"
+        val prefs = getSharedPreferences("azadlink_routing", MODE_PRIVATE)
+        val currentMode = prefs.getString("split_mode", "disabled") ?: "disabled"
+        val selected = prefs.getStringSet("selected_apps", emptySet())?.toMutableSet() ?: mutableSetOf()
+        val panel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(8), dp(16), dp(10))
+        }
+        panel.addView(text("برنامه‌هایی را که از تونل عبور می‌کنند انتخاب کن.", 14, Color.WHITE, true))
+        panel.addView(space(8))
+        val modeGroup = android.widget.RadioGroup(this).apply {
+            orientation = android.widget.RadioGroup.VERTICAL
+        }
+        val modeOptions = listOf(
+            "disabled" to "همهٔ برنامه‌ها از تونل عبور کنند",
+            "bypassSelected" to "همه به‌جز برنامه‌های انتخاب‌شده",
+            "onlySelected" to "فقط برنامه‌های انتخاب‌شده"
         )
-        AlertDialog.Builder(this)
-            .setTitle("منوی AzadLink")
-            .setItems(options) { _, which ->
-                when (which) {
-                    0 -> showRoutingSettings()
-                    1 -> showProxySettings()
-                    2 -> showProtocolDrawer()
-                    3 -> showAppSettings()
-                    4 -> showTunnelLogs()
-                }
+        val radios = modeOptions.map { (value, label) ->
+            android.widget.RadioButton(this).apply {
+                text = label
+                tag = value
+                textSize = 13f
+                setTextColor(Color.WHITE)
+                buttonTintList = android.content.res.ColorStateList.valueOf(Color.rgb(132, 103, 255))
+                isChecked = currentMode == value
+                modeGroup.addView(this)
             }
-            .setNegativeButton("بستن", null)
+        }
+        panel.addView(modeGroup)
+        panel.addView(space(8))
+        panel.addView(text("برنامه‌های نصب‌شده", 15, Color.rgb(207, 199, 255), true))
+        panel.addView(space(5))
+
+        val launcherIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+        val apps = packageManager.queryIntentActivities(launcherIntent, 0)
+            .mapNotNull { info ->
+                val appInfo = info.activityInfo?.applicationInfo ?: return@mapNotNull null
+                if (appInfo.packageName == packageName) return@mapNotNull null
+                val label = runCatching { packageManager.getApplicationLabel(appInfo).toString() }
+                    .getOrDefault(appInfo.packageName)
+                Triple(label, appInfo.packageName, info.loadIcon(packageManager))
+            }
+            .distinctBy { it.second }
+            .sortedBy { it.first.lowercase() }
+        val appChecks = mutableMapOf<String, android.widget.CheckBox>()
+        val appList = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        apps.forEach { (label, pkg, icon) ->
+            val check = android.widget.CheckBox(this).apply {
+                text = "$label  ·  $pkg"
+                textSize = 12f
+                setTextColor(Color.WHITE)
+                isChecked = selected.contains(pkg)
+                buttonTintList = android.content.res.ColorStateList.valueOf(Color.rgb(132, 103, 255))
+                setCompoundDrawablesWithIntrinsicBounds(icon, null, null, null)
+                compoundDrawablePadding = dp(8)
+            }
+            appChecks[pkg] = check
+            appList.addView(check)
+        }
+        val bulkActions = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+        }
+        bulkActions.addView(button("انتخاب همه") { appChecks.values.forEach { it.isChecked = true } },
+            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = dp(5) })
+        bulkActions.addView(button("پاک‌کردن انتخاب‌ها") { appChecks.values.forEach { it.isChecked = false } },
+            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginStart = dp(5) })
+        panel.addView(bulkActions)
+        panel.addView(space(5))
+        val appScroll = ScrollView(this).apply {
+            addView(appList)
+            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(290))
+        }
+        panel.addView(appScroll)
+        panel.addView(space(10))
+        panel.addView(button("تنظیم جداگانهٔ حالت پراکسی") { showProxySettings() })
+        panel.addView(space(5))
+        panel.addView(button("تنظیمات و ظاهر برنامه") { showAppSettings() })
+
+        AlertDialog.Builder(this)
+            .setTitle("کشوی برنامه‌ها")
+            .setView(ScrollView(this).apply { addView(panel) })
+            .setNegativeButton("لغو", null)
+            .setPositiveButton("ذخیرهٔ مسیریابی") { _, _ ->
+                val mode = radios.firstOrNull { it.isChecked }?.tag as? String ?: "disabled"
+                val chosen = appChecks.filterValues { it.isChecked }.keys.toSet()
+                if (mode == "onlySelected" && chosen.isEmpty()) {
+                    Toast.makeText(this, "برای حالت فقط برنامه‌های انتخاب‌شده، حداقل یک برنامه را انتخاب کن.", Toast.LENGTH_LONG).show()
+                    return@setPositiveButton
+                }
+                prefs.edit()
+                    .putString("split_mode", mode)
+                    .putStringSet("selected_apps", chosen)
+                    .apply()
+                Toast.makeText(this, "انتخاب برنامه‌ها ذخیره شد؛ اتصال را قطع و دوباره برقرار کن.", Toast.LENGTH_LONG).show()
+            }
             .show()
     }
 
