@@ -364,33 +364,56 @@ class MainActivity : Activity() {
     }
 
     private fun buildUi() {
-        val prefs = getSharedPreferences("azadlink_ui", MODE_PRIVATE)
-        val light = prefs.getString("theme", "dark") == "light"
-        val english = prefs.getString("language", "fa") == "en"
+        val uiPrefs = getSharedPreferences("azadlink_ui", MODE_PRIVATE)
+        val light = uiPrefs.getString("theme", "dark") == "light"
+        val english = uiPrefs.getString("language", "fa") == "en"
         fun tr(fa: String, en: String) = if (english) en else fa
+
         val bg = if (light) Color.rgb(245, 247, 252) else Color.rgb(7, 10, 19)
         val surface = if (light) Color.WHITE else Color.rgb(17, 23, 38)
         val mainText = if (light) Color.rgb(25, 32, 49) else Color.WHITE
         val muted = if (light) Color.rgb(83, 96, 120) else Color.rgb(152, 166, 192)
         val stroke = if (light) Color.rgb(210, 218, 233) else Color.rgb(44, 55, 78)
+        val accent = Color.rgb(132, 103, 255)
+        val accentSurface = if (light) Color.rgb(235, 231, 255) else Color.rgb(39, 33, 70)
+
         window.statusBarColor = bg
         window.navigationBarColor = bg
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            window.decorView.systemUiVisibility = if (light) View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR else 0
-        } else window.decorView.systemUiVisibility = 0
-        fun shape(color: Int, radius: Int, border: Int = stroke) = GradientDrawable().apply {
-            setColor(color); cornerRadius = dp(radius).toFloat(); setStroke(dp(1), border)
+            window.decorView.systemUiVisibility =
+                if (light) View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR else 0
+        } else {
+            window.decorView.systemUiVisibility = 0
         }
-        fun gap(h: Int) = View(this).apply { layoutParams = LinearLayout.LayoutParams(1, dp(h)) }
+
+        fun shape(color: Int, radius: Int, border: Int = stroke) = GradientDrawable().apply {
+            setColor(color)
+            cornerRadius = dp(radius).toFloat()
+            setStroke(dp(1), border)
+        }
+
+        fun gap(height: Int) = View(this).apply {
+            layoutParams = LinearLayout.LayoutParams(1, dp(height))
+        }
+
         fun label(value: String, size: Float, color: Int, bold: Boolean = false) = TextView(this).apply {
-            text = value; textSize = size; setTextColor(color)
+            text = value
+            textSize = size
+            setTextColor(color)
             if (bold) setTypeface(typeface, Typeface.BOLD)
             includeFontPadding = false
         }
+
         fun pill(title: String, fill: Int, textColor: Int = Color.WHITE, action: () -> Unit) = TextView(this).apply {
-            text = title; textSize = 14f; gravity = Gravity.CENTER; setTextColor(textColor)
-            setTypeface(typeface, Typeface.BOLD); setPadding(dp(13), dp(12), dp(13), dp(12))
-            background = shape(fill, 14); isClickable = true; isFocusable = true
+            text = title
+            textSize = 13.5f
+            gravity = Gravity.CENTER
+            setTextColor(textColor)
+            setTypeface(typeface, Typeface.BOLD)
+            setPadding(dp(13), dp(12), dp(13), dp(12))
+            background = shape(fill, 14)
+            isClickable = true
+            isFocusable = true
             setOnClickListener {
                 animate().cancel()
                 animate().scaleX(0.975f).scaleY(0.975f).setDuration(75).withEndAction {
@@ -399,78 +422,368 @@ class MainActivity : Activity() {
                 action()
             }
         }
+
+        fun sectionForProtocol(protocol: Protocol): Int = when (protocol) {
+            Protocol.VLESS, Protocol.VMESS, Protocol.TROJAN, Protocol.SHADOWSOCKS, Protocol.WIREGUARD -> 0
+            Protocol.DNSTT, Protocol.MASTER_DNS, Protocol.STORM_DNS -> 1
+            Protocol.PSIPHON -> 3
+            else -> 2
+        }
+
         val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL; setPadding(dp(16), dp(8), dp(16), dp(10)); setBackgroundColor(bg)
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(14), dp(8), dp(14), dp(10))
+            setBackgroundColor(bg)
         }
-        val toolbar = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(0, dp(5), 0, dp(13)) }
-        val menu = TextView(this).apply {
-            text = "☰"; textSize = 24f; gravity = Gravity.CENTER; setTextColor(mainText)
-            background = shape(surface, 14); layoutParams = LinearLayout.LayoutParams(dp(48), dp(46))
-            isClickable = true; isFocusable = true; contentDescription = tr("بازکردن کشو", "Open drawer")
-            setOnClickListener { showProtocolDrawer() }
+        val toolbar = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dp(4), 0, dp(11))
         }
-        val brand = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(12), 0, 0, 0) }
-        brand.addView(label("AzadLink", 21f, mainText, true))
-        brand.addView(label(tr("اتصال، به انتخاب تو", "Connectivity, your way"), 11f, muted))
-        toolbar.addView(menu)
-        toolbar.addView(brand, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        toolbar.addView(TextView(this).apply {
-            text = "⚙"; textSize = 22f; gravity = Gravity.CENTER; setTextColor(mainText); background = shape(surface, 14)
-            layoutParams = LinearLayout.LayoutParams(dp(48), dp(46)); isClickable = true; isFocusable = true
-            contentDescription = tr("تنظیمات", "Settings"); setOnClickListener { showAppSettings() }
-        })
-        root.addView(toolbar)
-        val scroll = ScrollView(this).apply { clipToPadding = false }
-        val content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(0, dp(3), 0, dp(16)) }
-        val statusCard = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(16), dp(15), dp(16), dp(15)); background = shape(surface, 20) }
-        statusCard.addView(label(tr("وضعیت اتصال", "Connection status"), 12f, muted, true))
-        statusCard.addView(gap(7))
-        topStatus = label(tr("آمادهٔ اتصال", "Ready to connect"), 15f, mainText, true)
-        topStatus.maxLines = 3
-        statusCard.addView(topStatus)
-        content.addView(statusCard); content.addView(gap(22))
-        val selectedCard = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; setPadding(dp(16), dp(18), dp(16), dp(18))
-            background = GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                if (light) intArrayOf(Color.rgb(230, 232, 255), Color.rgb(224, 243, 247)) else intArrayOf(Color.rgb(42, 35, 82), Color.rgb(20, 47, 64))
-            ).apply { cornerRadius = dp(26).toFloat(); setStroke(dp(1), if (light) Color.rgb(203, 209, 239) else Color.rgb(71, 68, 123)) }
-        }
-        selectedProtocolLabel = label(selectedProtocolName(), 21f, mainText, true).apply { gravity = Gravity.CENTER }
-        selectedProtocolHint = label(tr("پروتکل انتخاب‌شده", "Selected protocol"), 12f, muted).apply { gravity = Gravity.CENTER }
-        selectedCard.addView(selectedProtocolLabel); selectedCard.addView(gap(5)); selectedCard.addView(selectedProtocolHint); selectedCard.addView(gap(18))
-        val orb = TextView(this).apply {
-            textSize = 20f
-            gravity = Gravity.CENTER
-            setTextColor(Color.WHITE)
-            setTypeface(typeface, Typeface.BOLD)
-            layoutParams = LinearLayout.LayoutParams(dp(126), dp(126)).apply { gravity = Gravity.CENTER }
-            elevation = dp(5).toFloat()
+        val logo = android.widget.ImageView(this).apply {
+            setImageResource(R.mipmap.ic_launcher)
+            scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
+            background = shape(surface, 13)
+            clipToOutline = true
+            layoutParams = LinearLayout.LayoutParams(dp(45), dp(45))
+            contentDescription = tr("لوگوی AzadLink", "AzadLink logo")
             isClickable = true
             isFocusable = true
-            maxLines = 2
-            contentDescription = tr("اتصال با پروتکل انتخاب‌شده", "Connect with selected protocol")
-            setOnClickListener {
-                animate().cancel()
-                animate().scaleX(0.94f).scaleY(0.94f).setDuration(80).withEndAction {
-                    animate().scaleX(1f).scaleY(1f).setDuration(130).start()
-                }.start()
-                onConnectionOrbTapped()
-            }
+            setOnClickListener { showProtocolDrawer() }
         }
-        connectionOrb = orb
-        renderConnectionOrb(connectionUiState)
-        selectedCard.addView(orb); selectedCard.addView(gap(15))
-        connectionTimerText = label(tr("مدت اتصال · ۰۰:۰۰:۰۰", "Connected · 00:00:00"), 12f, if (light) Color.rgb(59, 69, 103) else Color.rgb(211, 222, 244), true).apply { gravity = Gravity.CENTER }
-        selectedCard.addView(connectionTimerText)
-        content.addView(selectedCard); content.addView(gap(13))
-        content.addView(pill(tr("قطع اتصال", "Disconnect"), if (light) Color.rgb(153, 64, 84) else Color.rgb(104, 47, 66)) { disconnectVpn() })
-        content.addView(gap(9))
-        content.addView(pill(tr("گزارش اتصال و خطا", "Connection diagnostics"), if (light) Color.rgb(226, 231, 243) else Color.rgb(24, 32, 49), mainText) { showTunnelLogs() })
-        content.addView(gap(15))
-        content.addView(label(tr("انتخاب پروتکل، تنظیمات پراکسی، انتخاب برنامه‌ها و افزودن سرور از کشوی کناری مدیریت می‌شوند.",
-            "Protocols, proxy mode, app routing and server profiles are managed from the side drawer."), 12f, muted))
+        val brand = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(11), 0, 0, 0)
+        }
+        brand.addView(label("AzadLink", 20f, mainText, true))
+        brand.addView(label(tr("اتصال، به انتخاب تو", "Connectivity, your way"), 11f, muted))
+        val menu = TextView(this).apply {
+            text = "☰"
+            textSize = 22f
+            gravity = Gravity.CENTER
+            setTextColor(mainText)
+            background = shape(surface, 13)
+            layoutParams = LinearLayout.LayoutParams(dp(44), dp(44))
+            contentDescription = tr("پروتکل‌ها و ابزارها", "Protocols and tools")
+            isClickable = true
+            isFocusable = true
+            setOnClickListener { showProtocolDrawer() }
+        }
+        val settings = TextView(this).apply {
+            text = "⚙"
+            textSize = 21f
+            gravity = Gravity.CENTER
+            setTextColor(mainText)
+            background = shape(surface, 13)
+            layoutParams = LinearLayout.LayoutParams(dp(44), dp(44)).apply { marginStart = dp(7) }
+            contentDescription = tr("تنظیمات برنامه", "App settings")
+            isClickable = true
+            isFocusable = true
+            setOnClickListener { showAppSettings() }
+        }
+        toolbar.addView(logo)
+        toolbar.addView(brand, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        toolbar.addView(menu)
+        toolbar.addView(settings)
+        root.addView(toolbar)
+
+        val scroll = ScrollView(this).apply { clipToPadding = false }
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(0, dp(2), 0, dp(15))
+        }
         scroll.addView(content)
         root.addView(scroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+
+        val navBar = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            setPadding(dp(4), dp(4), dp(4), dp(4))
+            background = shape(surface, 20)
+            elevation = dp(3).toFloat()
+        }
+        root.addView(navBar, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+            .apply { topMargin = dp(7) })
+
+        val navItems = mutableListOf<TextView>()
+        var activeSection = uiPrefs.getInt("section_index", sectionForProtocol(selectedProtocol())).coerceIn(0, 3)
+
+        fun renderNav() {
+            navItems.forEachIndexed { index, item ->
+                val selected = index == activeSection
+                item.background = shape(
+                    if (selected) accentSurface else Color.TRANSPARENT,
+                    14,
+                    if (selected) accent else surface
+                )
+                item.setTextColor(if (selected) accent else muted)
+                item.alpha = if (selected) 1f else 0.88f
+            }
+        }
+
+        fun protocolCard(title: String, description: String, selected: Boolean, action: () -> Unit) =
+            LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(13), dp(12), dp(13), dp(12))
+                background = shape(if (selected) accentSurface else surface, 16, if (selected) accent else stroke)
+                isClickable = true
+                isFocusable = true
+                addView(label((if (selected) "✓  " else "") + title, 14f, mainText, true))
+                addView(gap(4))
+                addView(label(description, 11.5f, muted))
+                setOnClickListener {
+                    animate().cancel()
+                    animate().scaleX(0.985f).scaleY(0.985f).setDuration(70).withEndAction {
+                        animate().scaleX(1f).scaleY(1f).setDuration(100).start()
+                    }.start()
+                    action()
+                }
+            }
+
+        fun renderSection(section: Int, animated: Boolean = false) {
+            val safeSection = section.coerceIn(0, 3)
+            activeSection = safeSection
+            uiPrefs.edit().putInt("section_index", safeSection).apply()
+            renderNav()
+
+            val drawContent: () -> Unit = {
+                content.removeAllViews()
+
+                val page = when (safeSection) {
+                    0 -> Pair(tr("پروتکل‌های سرور", "Server protocols"),
+                        tr("VLESS، VMess، Trojan، Shadowsocks و WireGuard", "VLESS, VMess, Trojan, Shadowsocks and WireGuard"))
+                    1 -> Pair(tr("تونل‌های DNS", "DNS tunnels"),
+                        tr("پروفایل‌ها و گزینه‌های تونل DNS", "DNS tunnel profiles and options"))
+                    2 -> Pair(tr("Aether و MASQUE", "Aether and MASQUE"),
+                        tr("اتصال خودکار، انتقال HTTP/2 و تنظیمات پیشرفته", "Auto-connect, HTTP/2 transport and advanced options"))
+                    else -> Pair(tr("Psiphon", "Psiphon"),
+                        tr("اتصال خودکار و امکان اتصال زنجیره‌ای", "Automatic connection and chained connection"))
+                }
+
+                val statusCard = LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    setPadding(dp(15), dp(13), dp(15), dp(13))
+                    background = shape(surface, 18)
+                }
+                statusCard.addView(label(tr("وضعیت اتصال", "Connection status"), 12f, muted, true))
+                statusCard.addView(gap(6))
+                topStatus = label(tr("آمادهٔ اتصال", "Ready to connect"), 14.5f, mainText, true).apply { maxLines = 3 }
+                statusCard.addView(topStatus)
+                content.addView(statusCard)
+                content.addView(gap(15))
+
+                content.addView(label(page.first, 19f, mainText, true))
+                content.addView(gap(4))
+                content.addView(label(page.second, 11.5f, muted))
+                content.addView(gap(12))
+
+                val selectedCard = LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    gravity = Gravity.CENTER
+                    setPadding(dp(15), dp(16), dp(15), dp(15))
+                    background = GradientDrawable(
+                        GradientDrawable.Orientation.TL_BR,
+                        if (light) intArrayOf(Color.rgb(230, 232, 255), Color.rgb(224, 243, 247))
+                        else intArrayOf(Color.rgb(42, 35, 82), Color.rgb(20, 47, 64))
+                    ).apply {
+                        cornerRadius = dp(24).toFloat()
+                        setStroke(dp(1), if (light) Color.rgb(203, 209, 239) else Color.rgb(71, 68, 123))
+                    }
+                }
+                selectedProtocolLabel = label(selectedProtocolName(), 20f, mainText, true).apply { gravity = Gravity.CENTER }
+                selectedProtocolHint = label(
+                    tr("پروتکل انتخاب‌شده · برای اتصال روی دکمه بزن", "Selected protocol · tap the button to connect"),
+                    11.5f, muted
+                ).apply { gravity = Gravity.CENTER }
+                selectedCard.addView(selectedProtocolLabel)
+                selectedCard.addView(gap(5))
+                selectedCard.addView(selectedProtocolHint)
+                selectedCard.addView(gap(14))
+
+                val orb = TextView(this).apply {
+                    textSize = 20f
+                    gravity = Gravity.CENTER
+                    setTextColor(Color.WHITE)
+                    setTypeface(typeface, Typeface.BOLD)
+                    layoutParams = LinearLayout.LayoutParams(dp(118), dp(118)).apply { gravity = Gravity.CENTER }
+                    elevation = dp(5).toFloat()
+                    isClickable = true
+                    isFocusable = true
+                    maxLines = 2
+                    contentDescription = tr("اتصال با پروتکل انتخاب‌شده", "Connect with selected protocol")
+                    setOnClickListener {
+                        animate().cancel()
+                        animate().scaleX(0.94f).scaleY(0.94f).setDuration(80).withEndAction {
+                            animate().scaleX(1f).scaleY(1f).setDuration(130).start()
+                        }.start()
+                        onConnectionOrbTapped()
+                    }
+                }
+                connectionOrb = orb
+                renderConnectionOrb(connectionUiState)
+                selectedCard.addView(orb)
+                selectedCard.addView(gap(12))
+                connectionTimerText = label(
+                    tr("مدت اتصال · ۰۰:۰۰:۰۰", "Connected · 00:00:00"),
+                    11.5f,
+                    if (light) Color.rgb(59, 69, 103) else Color.rgb(211, 222, 244),
+                    true
+                ).apply { gravity = Gravity.CENTER }
+                selectedCard.addView(connectionTimerText)
+                content.addView(selectedCard)
+                content.addView(gap(10))
+                content.addView(pill(tr("قطع اتصال", "Disconnect"), if (light) Color.rgb(153, 64, 84) else Color.rgb(104, 47, 66)) {
+                    disconnectVpn()
+                })
+                content.addView(gap(7))
+
+                when (safeSection) {
+                    0 -> {
+                        val items = listOf(
+                            Triple(Protocol.VLESS, "VLESS", tr("کانفیگ VLESS / Reality / TLS", "VLESS / Reality / TLS profiles")),
+                            Triple(Protocol.VMESS, "VMess", tr("پروفایل‌های VMess", "VMess profiles")),
+                            Triple(Protocol.TROJAN, "Trojan", tr("اتصال مبتنی بر TLS", "TLS-based connection")),
+                            Triple(Protocol.SHADOWSOCKS, "Shadowsocks", tr("پروکسی رمزگذاری‌شده", "Encrypted proxy profiles")),
+                            Triple(Protocol.WIREGUARD, "WireGuard", tr("تونل مبتنی بر کلید", "Key-based tunnel profiles"))
+                        )
+                        items.forEach { (protocol, title, description) ->
+                            content.addView(protocolCard(title, description, selectedProtocol() == protocol) {
+                                uiPrefs.edit().putString("selected_protocol", protocol.name).putInt("section_index", 0).apply()
+                                renderSection(0, true)
+                                Toast.makeText(this@MainActivity,
+                                    tr(title + " انتخاب شد.", title + " selected."),
+                                    Toast.LENGTH_SHORT).show()
+                            })
+                            content.addView(gap(7))
+                        }
+                        content.addView(pill(tr("مدیریت کانفیگ‌های این پروتکل", "Manage this protocol's profiles"), accent, Color.WHITE) {
+                            showServerProfilesDialog(selectedProtocol())
+                        })
+                    }
+                    1 -> {
+                        val items = listOf(
+                            Triple(Protocol.DNSTT, "DNSTT", tr("تونل TCP روی DNS", "TCP tunnel over DNS")),
+                            Triple(Protocol.MASTER_DNS, "Master DNS", tr("موتور MasterDNS", "MasterDNS engine")),
+                            Triple(Protocol.STORM_DNS, "Storm DNS", tr("موتور StormDNS", "StormDNS engine"))
+                        )
+                        items.forEach { (protocol, title, description) ->
+                            content.addView(protocolCard(title, description, selectedProtocol() == protocol) {
+                                uiPrefs.edit().putString("selected_protocol", protocol.name).putInt("section_index", 1).apply()
+                                renderSection(1, true)
+                            })
+                            content.addView(gap(7))
+                        }
+                        content.addView(label(
+                            tr("نکته: در این شاخه، اتصال واقعی موتورهای DNS هنوز کامل یکپارچه نشده؛ این صفحه فعلاً برای انتخاب و مدیریت پروفایل‌هاست.",
+                                "Note: live runtime integration for the DNS engines is not complete on this branch; this page currently supports selection and profile management."),
+                            11.5f, Color.rgb(207, 153, 65)
+                        ))
+                        content.addView(gap(8))
+                        content.addView(pill(tr("مدیریت پروفایل‌های DNS", "Manage DNS profiles"), accent, Color.WHITE) {
+                            showServerProfilesDialog(selectedProtocol())
+                        })
+                    }
+                    2 -> {
+                        content.addView(pill(tr("تنظیمات پیشرفتهٔ MASQUE", "Advanced MASQUE settings"), accent, Color.WHITE) {
+                            showMasqueAdvancedSettings()
+                        })
+                        content.addView(gap(7))
+                        content.addView(pill(tr("مسیریابی برنامه‌ها", "App routing"), surface, mainText) {
+                            showRoutingSettings()
+                        })
+                    }
+                    else -> {
+                        content.addView(pill(tr("تنظیمات Psiphon", "Psiphon settings"), accent, Color.WHITE) {
+                            showPsiphonSettings()
+                        })
+                        content.addView(gap(7))
+                        content.addView(pill(tr("اتصال زنجیره‌ای · MASQUE → Psiphon", "Chained connection · MASQUE → Psiphon"), surface, mainText) {
+                            requestPsiphonChainConnect()
+                        })
+                    }
+                }
+
+                content.addView(gap(7))
+                content.addView(pill(tr("حالت پروکسی", "Proxy mode"), surface, mainText) { showProxySettings() })
+                content.addView(gap(7))
+                content.addView(pill(tr("انتخاب برنامه‌های تونل‌شونده", "Choose apps routed through the tunnel"), surface, mainText) {
+                    showRoutingSettings()
+                })
+                content.addView(gap(7))
+                content.addView(pill(tr("گزارش اتصال و خطا", "Connection diagnostics"), surface, mainText) {
+                    showTunnelLogs()
+                })
+
+                val servicePrefs = getSharedPreferences(AzadLinkVpnService.PREFS, MODE_PRIVATE)
+                val saved = servicePrefs.getString(AzadLinkVpnService.KEY_MESSAGE, tr("آمادهٔ اتصال", "Ready to connect"))
+                    ?: tr("آمادهٔ اتصال", "Ready to connect")
+                topStatus.text = if (english && saved == "آمادهٔ اتصال") "Ready to connect"
+                    else if (english) "Status: " + saved.replace("وضعیت:", "Status:")
+                        .replace("در حال اتصال", "Connecting")
+                        .replace("متصل", "Connected")
+                        .replace("قطع اتصال", "Disconnecting")
+                        .replace("اتصال قطع شد", "Disconnected")
+                    else "وضعیت: " + saved
+            }
+
+            if (animated) {
+                content.animate().cancel()
+                content.animate().alpha(0.18f).translationY(dp(7).toFloat()).setDuration(90).withEndAction {
+                    drawContent()
+                    content.alpha = 0f
+                    content.translationY = dp(-4).toFloat()
+                    content.animate().alpha(1f).translationY(0f).setDuration(175).start()
+                }.start()
+            } else {
+                drawContent()
+            }
+        }
+
+        val navSpecs = listOf(
+            Triple("⇄", tr("سرورها", "Servers"), 0),
+            Triple("⌁", tr("DNS", "DNS"), 1),
+            Triple("◉", tr("Aether", "Aether"), 2),
+            Triple("⛓", tr("Psiphon", "Psiphon"), 3)
+        )
+        navSpecs.forEachIndexed { index, spec ->
+            val item = TextView(this).apply {
+                text = spec.first + "\n" + spec.second
+                textSize = 10.5f
+                gravity = Gravity.CENTER
+                maxLines = 2
+                setPadding(dp(2), dp(9), dp(2), dp(9))
+                layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+                isClickable = true
+                isFocusable = true
+                contentDescription = spec.second
+                setOnClickListener {
+                    val current = selectedProtocol()
+                    val belongs = when (index) {
+                        0 -> current in setOf(Protocol.VLESS, Protocol.VMESS, Protocol.TROJAN, Protocol.SHADOWSOCKS, Protocol.WIREGUARD)
+                        1 -> current in setOf(Protocol.DNSTT, Protocol.MASTER_DNS, Protocol.STORM_DNS)
+                        2 -> current == Protocol.MASQUE
+                        else -> current == Protocol.PSIPHON
+                    }
+                    if (!belongs) {
+                        val defaultProtocol = when (index) {
+                            0 -> Protocol.VLESS
+                            1 -> Protocol.DNSTT
+                            2 -> Protocol.MASQUE
+                            else -> Protocol.PSIPHON
+                        }
+                        uiPrefs.edit().putString("selected_protocol", defaultProtocol.name).apply()
+                    }
+                    renderSection(index, true)
+                }
+            }
+            navItems.add(item)
+            navBar.addView(item, LinearLayout.LayoutParams(0, dp(56), 1f).apply {
+                marginStart = dp(2)
+                marginEnd = dp(2)
+            })
+        }
+
+        renderSection(activeSection, false)
         setContentView(root)
         refreshState()
     }
