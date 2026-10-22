@@ -19,12 +19,12 @@ android {
     namespace = "com.azadlink.vpn"
     compileSdk = 35
     defaultConfig {
-        // AzadLink v0.9.4 release candidate
+        // AzadLink v0.10.0 stable release
         applicationId = "com.azadlink.vpn"
         minSdk = 26
         targetSdk = 35
-        versionCode = 13
-        versionName = "0.9.4"
+        versionCode = 14
+        versionName = "0.10.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     signingConfigs {
