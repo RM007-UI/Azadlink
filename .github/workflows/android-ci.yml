@@ -185,6 +185,10 @@ jobs:
             if [[ -n "${!name:-}" ]]; then present=$((present + 1)); fi
           done
           if [[ "$present" == "0" ]]; then
+            if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+              echo "::error::A stable release tag requires the persistent signing keystore secrets."
+              exit 1
+            fi
             echo "enabled=false" >> "$GITHUB_OUTPUT"
             echo "No release-signing secrets found; publishing the debug artifact only."
           elif [[ "$present" == "4" ]]; then
@@ -227,26 +231,19 @@ jobs:
         if: >-
           github.event_name != 'pull_request' &&
           steps.signing.outputs.enabled == 'true' &&
-          (
-            startsWith(github.ref, 'refs/tags/v') ||
-            (
-              github.ref == 'refs/heads/feature/aether-masque-autoconnect' &&
-              github.event_name == 'push' &&
-              github.event.head_commit.message == 'Publish AzadLink v0.9.4 release'
-            )
-          )
+          startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'v0.9.4' }}
+          tag_name: ${{ github.ref_name }}
           target_commitish: ${{ github.sha }}
-          prerelease: ${{ !startsWith(github.ref, 'refs/tags/v') }}
-          name: AzadLink v0.9.4
+          prerelease: false
+          name: AzadLink ${{ github.ref_name }} · Stable
           body: |
-            AzadLink v0.9.4 release candidate.
+            AzadLink ${{ github.ref_name }} stable release.
 
-            Includes a pinned Psiphon ConsoleClient build and a CI check for the previously reported FRONTED-MEEK-CDN-OSSH protocol error. MASQUE HTTP/2 support is included.
+            Includes the redesigned side drawer, protocol configuration management, app-routing and proxy settings, localized interface options, refined notification icon, and Aether MASQUE HTTP/2 defaults.
 
-            This APK passed CI build and unit tests. Device-level verification of all VPN modes is still required; report any connection failures with the in-app logs.
+            GitHub Actions builds the signed APK and runs unit tests before attaching this release asset. Actual VPN reachability can still vary by network and should be checked on the target device.
           files: app/build/outputs/apk/release/app-release.apk
           generate_release_notes: true
       - name: Publish build summary
