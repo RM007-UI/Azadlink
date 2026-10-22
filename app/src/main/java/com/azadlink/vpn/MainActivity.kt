@@ -42,6 +42,7 @@ import org.json.JSONObject
 
 class MainActivity : Activity() {
     private val profiles = mutableListOf<ProtocolProfile>()
+    private var activeProfileFilter: Protocol? = null
     private lateinit var profileInput: EditText
     private lateinit var profileList: LinearLayout
     private lateinit var topStatus: TextView
@@ -604,6 +605,7 @@ class MainActivity : Activity() {
     }
 
     private fun showServerProfilesDialog(filter: Protocol? = null) {
+        activeProfileFilter = filter
         val prefs = getSharedPreferences("azadlink_ui", MODE_PRIVATE)
         val english = prefs.getString("language", "fa") == "en"
         fun tr(fa: String, en: String) = if (english) en else fa
@@ -1105,7 +1107,7 @@ class MainActivity : Activity() {
     private fun importProfiles() {
         val result = ProtocolParser.parse(profileInput.text?.toString().orEmpty())
         var added = 0
-        result.profiles.forEach { candidate ->
+        result.profiles.filter { activeProfileFilter == null || it.protocol == activeProfileFilter }.forEach { candidate ->
             if (profiles.none { existing -> existing.rawConfig == candidate.rawConfig }) {
                 profiles.add(candidate)
                 added++
