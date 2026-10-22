@@ -426,17 +426,11 @@ class MainActivity : Activity() {
             }
         }
         selectedCard.addView(orb); selectedCard.addView(gap(15))
-        selectedCard.addView(pill(tr("انتخاب پروتکل و تنظیمات", "Protocols & settings"), if (light) Color.rgb(83, 69, 171) else Color.rgb(65, 55, 126)) { showProtocolDrawer() })
-        selectedCard.addView(gap(8))
         connectionTimerText = label(tr("مدت اتصال · ۰۰:۰۰:۰۰", "Connected · 00:00:00"), 12f, if (light) Color.rgb(59, 69, 103) else Color.rgb(211, 222, 244), true).apply { gravity = Gravity.CENTER }
         selectedCard.addView(connectionTimerText)
         content.addView(selectedCard); content.addView(gap(13))
-        val actions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        actions.addView(pill(tr("اتصال زنجیره‌ای", "Chain connection"), if (light) Color.rgb(40, 135, 124) else Color.rgb(31, 115, 105)) { requestPsiphonChainConnect() },
-            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = dp(5) })
-        actions.addView(pill(tr("قطع اتصال", "Disconnect"), if (light) Color.rgb(153, 64, 84) else Color.rgb(104, 47, 66)) { disconnectVpn() },
-            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginStart = dp(5) })
-        content.addView(actions); content.addView(gap(9))
+        content.addView(pill(tr("قطع اتصال", "Disconnect"), if (light) Color.rgb(153, 64, 84) else Color.rgb(104, 47, 66)) { disconnectVpn() })
+        content.addView(gap(9))
         content.addView(pill(tr("گزارش اتصال و خطا", "Connection diagnostics"), if (light) Color.rgb(226, 231, 243) else Color.rgb(24, 32, 49), mainText) { showTunnelLogs() })
         content.addView(gap(15))
         content.addView(label(tr("انتخاب پروتکل، تنظیمات پراکسی، انتخاب برنامه‌ها و افزودن سرور از کشوی کناری مدیریت می‌شوند.",
