@@ -52,6 +52,14 @@ class MainActivity : Activity() {
     private var receiverRegistered = false
     private var selectedProtocolLabel: TextView? = null
     private var selectedProtocolHint: TextView? = null
+    private var connectionTimerText: TextView? = null
+    private val connectionTimerHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val connectionTimerTicker = object : Runnable {
+        override fun run() {
+            renderConnectionTimer()
+            connectionTimerHandler.postDelayed(this, 1000L)
+        }
+    }
     private val tunnelStatusListener: (TunnelSnapshot) -> Unit = { snapshot ->
         runOnUiThread {
             if (::topStatus.isInitialized) {
@@ -66,6 +74,11 @@ class MainActivity : Activity() {
                 val detail = snapshot.message?.takeIf { it.isNotBlank() }?.let { " · $it" } ?: ""
                 val gateway = snapshot.gateway?.let { " · $it" } ?: ""
                 topStatus.text = "وضعیت واقعی: $state$gateway$detail"
+                when (snapshot.stage) {
+                    TunnelStage.CONNECTED -> setConnectionTimerActive(true)
+                    TunnelStage.DISCONNECTED, TunnelStage.FAILED -> setConnectionTimerActive(false)
+                    else -> Unit
+                }
             }
         }
     }
@@ -73,6 +86,10 @@ class MainActivity : Activity() {
         override fun onReceive(context: Context?, intent: Intent?) {
             val message = intent?.getStringExtra(AzadLinkVpnService.EXTRA_MESSAGE) ?: return
             topStatus.text = "وضعیت: $message"
+            when {
+                message.contains("متصل ·", true) || message.contains("Psiphon متصل شد", true) || message.contains("تونل MASQUE برقرار شد", true) -> setConnectionTimerActive(true)
+                message.contains("اتصال قطع شد", true) || message.contains("خطای اتصال:", true) || message.contains("اتصال تونل تأیید نشد", true) -> setConnectionTimerActive(false)
+            }
         }
     }
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -94,8 +111,11 @@ class MainActivity : Activity() {
         }
         refreshState()
         TunnelBus.addStatusListener(tunnelStatusListener)
+        connectionTimerHandler.removeCallbacks(connectionTimerTicker)
+        connectionTimerHandler.post(connectionTimerTicker)
     }
     override fun onStop() {
+        connectionTimerHandler.removeCallbacks(connectionTimerTicker)
         TunnelBus.removeStatusListener(tunnelStatusListener)
         if (receiverRegistered) { runCatching { unregisterReceiver(statusReceiver) }; receiverRegistered = false }
         super.onStop()
@@ -503,7 +523,9 @@ class MainActivity : Activity() {
             )
             isClickable = true
             isFocusable = true
-            setOnClickListener { showAppSettings() }
+            text = "☰"
+            setOnClickListener { showAppDrawer() }
+            contentDescription = "منوی برنامه و مسیریابی"
             layoutParams = LinearLayout.LayoutParams(dp(45), dp(45))
         }
         header.addView(settingsButton)
@@ -658,6 +680,21 @@ class MainActivity : Activity() {
                 setPadding(0, dp(12), 0, 0)
             }
             connectHero.addView(connectionHelp)
+            spaceInto(connectHero, 14)
+            connectionTimerText = TextView(this).apply {
+                text = "مدت اتصال  ·  ۰۰:۰۰:۰۰"
+                textSize = 13f
+                gravity = Gravity.CENTER
+                setTextColor(Color.rgb(210, 224, 245))
+                setTypeface(typeface, Typeface.BOLD)
+                setPadding(dp(12), dp(10), dp(12), dp(10))
+                background = GradientDrawable().apply {
+                    setColor(Color.argb(45, 8, 13, 28))
+                    cornerRadius = dp(14).toFloat()
+                    setStroke(dp(1), Color.argb(90, 165, 174, 255))
+                }
+            }
+            connectHero.addView(connectionTimerText, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
             page.addView(connectHero)
             spaceInto(page, 20)
             sectionTitle(page, "پروتکل‌های سروری", "VLESS، VMess، Trojan و Shadowsocks")
@@ -666,6 +703,7 @@ class MainActivity : Activity() {
             actionCard(page, "T", "Trojan", "اتصال مبتنی بر TLS", { showProtocolDetail(Protocol.TROJAN) }, Color.rgb(35, 150, 135))
             actionCard(page, "S", "Shadowsocks", "پروکسی رمزگذاری‌شده", { showProtocolDetail(Protocol.SHADOWSOCKS) }, Color.rgb(184, 104, 66))
             actionCard(page, "W", "WireGuard", "تونل مبتنی بر کلید", { showProtocolDetail(Protocol.WIREGUARD) }, Color.rgb(68, 131, 181))
+            actionCard(page, "A", "Aether · MASQUE", "اتصال خودکار؛ تنظیمات پیشرفته و HTTP/2", { showProtocolDetail(Protocol.MASQUE) }, Color.rgb(114, 84, 224))
             spaceInto(page, 9)
             sectionTitle(page, "افزودن پروفایل", "لینک را وارد کن؛ تشخیص پروتکل خودکار است")
             val inputShell = LinearLayout(this).apply {
@@ -865,7 +903,7 @@ class MainActivity : Activity() {
             background = panelBackground(Color.rgb(14, 19, 31), 22, Color.rgb(31, 40, 60))
             elevation = dp(6).toFloat()
         }
-        val tabNames = listOf("سرورها", "DNS", "Aether", "Psiphon")
+        val tabNames = listOf("پروتکل‌ها", "DNS", "Aether", "Psiphon")
         val tabIcons = listOf("⌘", "⌁", "◈", "✦")
         val tabButtons = mutableListOf<LinearLayout>()
         fun selectTab(index: Int) {
@@ -936,6 +974,32 @@ class MainActivity : Activity() {
         setContentView(root)
         selectTab(0)
         renderProfiles()
+    }
+
+    private fun setConnectionTimerActive(active: Boolean) {
+        val prefs = getSharedPreferences("azadlink_connection", MODE_PRIVATE)
+        if (active) {
+            if (prefs.getLong("connected_since_ms", 0L) <= 0L) {
+                prefs.edit().putLong("connected_since_ms", System.currentTimeMillis()).apply()
+            }
+        } else {
+            prefs.edit().remove("connected_since_ms").apply()
+        }
+        renderConnectionTimer()
+    }
+
+    private fun renderConnectionTimer() {
+        val view = connectionTimerText ?: return
+        val start = getSharedPreferences("azadlink_connection", MODE_PRIVATE).getLong("connected_since_ms", 0L)
+        if (start <= 0L) {
+            view.text = "مدت اتصال  ·  ۰۰:۰۰:۰۰"
+            return
+        }
+        val seconds = ((System.currentTimeMillis() - start).coerceAtLeast(0L) / 1000L)
+        val hours = seconds / 3600L
+        val minutes = (seconds % 3600L) / 60L
+        val secs = seconds % 60L
+        view.text = "مدت اتصال  ·  %02d:%02d:%02d".format(java.util.Locale.ROOT, hours, minutes, secs)
     }
 
     private fun showTunnelLogs() {
@@ -1103,6 +1167,55 @@ class MainActivity : Activity() {
             .show()
     }
 
+    private fun showAppDrawer() {
+        val options = arrayOf(
+            "مسیریابی برنامه‌ها  ·  انتخاب برنامه‌های عبوری از تونل",
+            "حالت پراکسی  ·  تنظیم جداگانه",
+            "انتخاب پروتکل اتصال",
+            "تنظیمات و ظاهر برنامه",
+            "گزارش موتور و خطاها"
+        )
+        AlertDialog.Builder(this)
+            .setTitle("منوی AzadLink")
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> showRoutingSettings()
+                    1 -> showProxySettings()
+                    2 -> showProtocolDrawer()
+                    3 -> showAppSettings()
+                    4 -> showTunnelLogs()
+                }
+            }
+            .setNegativeButton("بستن", null)
+            .show()
+    }
+
+    private fun showProxySettings() {
+        val prefs = getSharedPreferences("azadlink_routing", MODE_PRIVATE)
+        val panel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(18), dp(10), dp(18), dp(8))
+        }
+        val enabled = android.widget.Switch(this).apply {
+            text = "فقط حالت پراکسی (بدون VPN سراسری)"
+            textSize = 14f
+            setTextColor(Color.WHITE)
+            isChecked = prefs.getBoolean("proxy_only", false)
+        }
+        panel.addView(enabled)
+        panel.addView(space(8))
+        panel.addView(text("در این حالت موتور به‌جای مسیریابی کل گوشی، پراکسی محلی را فراهم می‌کند. برای Xray پورت SOCKS برابر 127.0.0.1:10808 است؛ Aether از پورت خودش استفاده می‌کند. پشتیبانی از این حالت به موتور انتخابی بستگی دارد و برای موتورهای DNS هنوز یکسان نیست.", 12, Color.rgb(177, 188, 207)))
+        AlertDialog.Builder(this)
+            .setTitle("حالت پراکسی")
+            .setView(panel)
+            .setNegativeButton("لغو", null)
+            .setPositiveButton("ذخیره") { _, _ ->
+                prefs.edit().putBoolean("proxy_only", enabled.isChecked).apply()
+                Toast.makeText(this, "حالت پراکسی ذخیره شد؛ اتصال فعلی را قطع و دوباره برقرار کن.", Toast.LENGTH_LONG).show()
+            }
+            .show()
+    }
+
     private fun showRoutingSettings() {
         val prefs = getSharedPreferences("azadlink_routing", MODE_PRIVATE)
         val currentMode = prefs.getString("split_mode", "disabled") ?: "disabled"
@@ -1131,18 +1244,6 @@ class MainActivity : Activity() {
         }
         panel.addView(modeGroup)
         panel.addView(space(8))
-        val proxyOnly = android.widget.CheckBox(this).apply {
-            text = "حالت فقط پراکسی (بدون مسیریابی سراسری)"
-            textSize = 13f
-            setTextColor(Color.WHITE)
-            isChecked = prefs.getBoolean("proxy_only", false)
-        }
-        panel.addView(proxyOnly)
-        panel.addView(text(
-            "حالت فقط پراکسی برای Aether/Psiphon و پروتکل‌های Xray فعال است؛ موتورهای DNS هنوز به یکپارچه‌سازی جداگانه نیاز دارند. در این حالت، برنامه‌های دلخواه باید دستی به پراکسی محلی وصل شوند (Xray: SOCKS5 روی 127.0.0.1:10808؛ Aether: پورت SOCKS انتخاب‌شده).",
-            11, Color.rgb(255, 205, 115)
-        ))
-        panel.addView(space(10))
         panel.addView(text("برنامه‌ها", 15, Color.rgb(207, 199, 255), true))
         panel.addView(space(5))
 
@@ -1187,7 +1288,6 @@ class MainActivity : Activity() {
                 prefs.edit()
                     .putString("split_mode", mode)
                     .putStringSet("selected_apps", chosen.toSet())
-                    .putBoolean("proxy_only", proxyOnly.isChecked)
                     .apply()
                 Toast.makeText(this, "تنظیمات ذخیره شد؛ اتصال را قطع و دوباره برقرار کن.", Toast.LENGTH_LONG).show()
             }
