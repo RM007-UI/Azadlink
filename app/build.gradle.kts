@@ -19,6 +19,7 @@ android {
     namespace = "com.azadlink.vpn"
     compileSdk = 35
     defaultConfig {
+        // AzadLink v0.9.3 release candidate
         applicationId = "com.azadlink.vpn"
         minSdk = 26
         targetSdk = 35
