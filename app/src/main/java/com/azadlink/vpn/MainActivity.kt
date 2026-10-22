@@ -54,6 +54,12 @@ class MainActivity : Activity() {
     private var selectedProtocolLabel: TextView? = null
     private var selectedProtocolHint: TextView? = null
     private var connectionTimerText: TextView? = null
+    private enum class ConnectionUiState { DISCONNECTED, CONNECTING, CONNECTED, DISCONNECTING, FAILED }
+    private var connectionUiState = ConnectionUiState.DISCONNECTED
+    private var connectionOrb: TextView? = null
+    private var connectionPulse: ObjectAnimator? = null
+    private val connectionFeedbackHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private var connectionFeedbackRunnable: Runnable? = null
     private val connectionTimerHandler = android.os.Handler(android.os.Looper.getMainLooper())
     private val connectionTimerTicker = object : Runnable {
         override fun run() {
@@ -75,22 +81,26 @@ class MainActivity : Activity() {
                 val detail = snapshot.message?.takeIf { it.isNotBlank() }?.let { " · $it" } ?: ""
                 val gateway = snapshot.gateway?.let { " · $it" } ?: ""
                 topStatus.text = localizeUi("وضعیت واقعی: $state$gateway$detail")
-                when (snapshot.stage) {
-                    TunnelStage.CONNECTED -> setConnectionTimerActive(true)
-                    TunnelStage.DISCONNECTED, TunnelStage.FAILED -> setConnectionTimerActive(false)
-                    else -> Unit
-                }
+                val showDisconnected = snapshot.stage == TunnelStage.DISCONNECTED &&
+                    connectionUiState in setOf(ConnectionUiState.CONNECTING, ConnectionUiState.CONNECTED, ConnectionUiState.DISCONNECTING)
+                setConnectionUiState(
+                    when (snapshot.stage) {
+                        TunnelStage.DISCONNECTED -> ConnectionUiState.DISCONNECTED
+                        TunnelStage.CONNECTING, TunnelStage.VALIDATING -> ConnectionUiState.CONNECTING
+                        TunnelStage.CONNECTED -> ConnectionUiState.CONNECTED
+                        TunnelStage.DISCONNECTING -> ConnectionUiState.DISCONNECTING
+                        TunnelStage.FAILED -> ConnectionUiState.FAILED
+                    },
+                    showDisconnectedFeedback = showDisconnected
+                )
             }
         }
     }
     private val statusReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             val message = intent?.getStringExtra(AzadLinkVpnService.EXTRA_MESSAGE) ?: return
-            topStatus.text = localizeUi("وضعیت: $message")
-            when {
-                message.contains("متصل ·", true) || message.contains("Psiphon متصل شد", true) || message.contains("تونل MASQUE برقرار شد", true) -> setConnectionTimerActive(true)
-                message.contains("اتصال قطع شد", true) || message.contains("خطای اتصال:", true) || message.contains("اتصال تونل تأیید نشد", true) -> setConnectionTimerActive(false)
-            }
+            if (::topStatus.isInitialized) topStatus.text = localizeUi("وضعیت: $message")
+            applyConnectionStateFromMessage(message, liveEvent = true)
         }
     }
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -145,7 +155,7 @@ class MainActivity : Activity() {
         if (pendingPsiphonChain) {
             pendingPsiphonChain = false
             if (resultCode == RESULT_OK) startPsiphonChainConnect()
-            else Toast.makeText(this, "اجازهٔ VPN داده نشد", Toast.LENGTH_LONG).show()
+            else { setConnectionUiState(ConnectionUiState.DISCONNECTED); Toast.makeText(this, "اجازهٔ VPN داده نشد", Toast.LENGTH_LONG).show() }
             return
         }
         if (pendingPsiphonAuto) {
@@ -170,6 +180,7 @@ class MainActivity : Activity() {
         val english = getSharedPreferences("azadlink_ui", MODE_PRIVATE).getString("language", "fa") == "en"
         val saved = prefs.getString(AzadLinkVpnService.KEY_MESSAGE, if (english) "Ready to connect" else "آمادهٔ اتصال") ?: if (english) "Ready to connect" else "آمادهٔ اتصال"
         topStatus.text = if (english && saved == "آمادهٔ اتصال") "Ready to connect" else (if (english) saved.replace("وضعیت:", "Status:").replace("در حال اتصال", "Connecting").replace("متصل", "Connected").replace("قطع اتصال", "Disconnecting").replace("اتصال قطع شد", "Disconnected") else "وضعیت: " + saved)
+        applyConnectionStateFromMessage(saved, liveEvent = false)
     }
 
     private fun requestConnect(profile: ProtocolProfile) {
@@ -190,6 +201,7 @@ class MainActivity : Activity() {
             }
         }
         validation.exceptionOrNull()?.let { Toast.makeText(this, "کانفیگ آمادهٔ اجرا نیست: ${it.message ?: "فرمت پشتیبانی‌نشده"}", Toast.LENGTH_LONG).show(); return }
+        setConnectionUiState(ConnectionUiState.CONNECTING)
         pendingConnectProfile = profile
         val prepareIntent = VpnService.prepare(this)
         if (prepareIntent != null) startActivityForResult(prepareIntent, REQUEST_VPN_PERMISSION)
@@ -201,6 +213,7 @@ class MainActivity : Activity() {
         catch (_: ActivityNotFoundException) { Toast.makeText(this, "مدیر فایل سازگار پیدا نشد", Toast.LENGTH_LONG).show() }
     }
     private fun startVpn(profile: ProtocolProfile) {
+        setConnectionUiState(ConnectionUiState.CONNECTING)
         val serviceIntent = Intent(this, AzadLinkVpnService::class.java).apply {
             action = AzadLinkVpnService.ACTION_CONNECT
             putExtra(AzadLinkVpnService.EXTRA_PROFILE, profile.rawConfig)
@@ -210,7 +223,9 @@ class MainActivity : Activity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(serviceIntent) else startService(serviceIntent)
         topStatus.text = "وضعیت: درخواست اتصال ارسال شد"
     }
+
     private fun requestPsiphonAutoConnect() {
+        setConnectionUiState(ConnectionUiState.CONNECTING)
         val prepareIntent = VpnService.prepare(this)
         if (prepareIntent != null) {
             pendingPsiphonAuto = true
@@ -219,11 +234,13 @@ class MainActivity : Activity() {
     }
 
     private fun startPsiphonAutoConnect() {
+        setConnectionUiState(ConnectionUiState.CONNECTING)
         topStatus.text = "وضعیت: در حال راه‌اندازی Psiphon…"
         val country = getSharedPreferences("azadlink_psiphon_settings", MODE_PRIVATE)
             .getString("country", "") ?: ""
         PsiphonAutoConnector.connect(this, { message ->
             if (::topStatus.isInitialized) topStatus.text = "وضعیت: $message"
+            applyConnectionStateFromMessage(message, liveEvent = true)
             when {
                 message.contains("متصل شد", true) -> setConnectionTimerActive(true)
                 message.contains("ناموفق", true) || message.contains("آماده نشد", true) -> setConnectionTimerActive(false)
@@ -233,6 +250,7 @@ class MainActivity : Activity() {
     }
 
     private fun requestPsiphonChainConnect() {
+        setConnectionUiState(ConnectionUiState.CONNECTING)
         val prepareIntent = VpnService.prepare(this)
         if (prepareIntent != null) {
             pendingPsiphonChain = true
@@ -241,11 +259,13 @@ class MainActivity : Activity() {
     }
 
     private fun startPsiphonChainConnect() {
+        setConnectionUiState(ConnectionUiState.CONNECTING)
         topStatus.text = "وضعیت: در حال راه‌اندازی زنجیرهٔ MASQUE → Psiphon…"
         val country = getSharedPreferences("azadlink_psiphon_settings", MODE_PRIVATE)
             .getString("country", "") ?: ""
         PsiphonAutoConnector.connect(this, { message ->
             if (::topStatus.isInitialized) topStatus.text = "وضعیت: $message"
+            applyConnectionStateFromMessage(message, liveEvent = true)
             when {
                 message.contains("متصل شد", true) -> setConnectionTimerActive(true)
                 message.contains("ناموفق", true) || message.contains("آماده نشد", true) -> setConnectionTimerActive(false)
@@ -307,6 +327,7 @@ class MainActivity : Activity() {
     }
 
     private fun requestAutoConnect() {
+        setConnectionUiState(ConnectionUiState.CONNECTING)
         val prepareIntent = VpnService.prepare(this)
         if (prepareIntent != null) {
             pendingAutoConnect = true
@@ -317,24 +338,31 @@ class MainActivity : Activity() {
     }
 
     private fun startAutoConnect() {
+        setConnectionUiState(ConnectionUiState.CONNECTING)
         topStatus.text = "وضعیت: در حال آماده‌سازی موتور Aether…"
         AetherAutoConnector.connect(this) { message ->
             topStatus.text = "وضعیت: $message"
-            if (message.startsWith("خطای اتصال:")) {
+            applyConnectionStateFromMessage(message, liveEvent = true)
+            if (message.startsWith("خطای اتصال:") || message.contains("برقرار نشد")) {
                 Toast.makeText(this, message, Toast.LENGTH_LONG).show()
             }
         }
     }
 
     private fun disconnectVpn() {
-        setConnectionTimerActive(false)
+        if (connectionUiState == ConnectionUiState.DISCONNECTED || connectionUiState == ConnectionUiState.FAILED) {
+            AetherAutoConnector.disconnect(this)
+            return
+        }
+        setConnectionUiState(ConnectionUiState.DISCONNECTING)
         AetherAutoConnector.disconnect(this)
         val stopIntent = Intent(this, AzadLinkVpnService::class.java).apply {
             action = AzadLinkVpnService.ACTION_DISCONNECT
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(stopIntent) else startService(stopIntent)
-        topStatus.text = "وضعیت: درخواست قطع اتصال ارسال شد"
+        topStatus.text = "وضعیت: در حال قطع اتصال…"
     }
+
     private fun buildUi() {
         val prefs = getSharedPreferences("azadlink_ui", MODE_PRIVATE)
         val light = prefs.getString("theme", "dark") == "light"
@@ -411,22 +439,27 @@ class MainActivity : Activity() {
         selectedProtocolHint = label(tr("پروتکل انتخاب‌شده", "Selected protocol"), 12f, muted).apply { gravity = Gravity.CENTER }
         selectedCard.addView(selectedProtocolLabel); selectedCard.addView(gap(5)); selectedCard.addView(selectedProtocolHint); selectedCard.addView(gap(18))
         val orb = TextView(this).apply {
-            text = tr("⟡\nاتصال", "⟡\nConnect"); textSize = 20f; gravity = Gravity.CENTER
-            setTextColor(Color.WHITE); setTypeface(typeface, Typeface.BOLD)
-            background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(Color.rgb(126, 88, 255), Color.rgb(48, 185, 206)))
-                .apply { shape = GradientDrawable.OVAL; setStroke(dp(3), Color.argb(75, 255, 255, 255)) }
+            textSize = 20f
+            gravity = Gravity.CENTER
+            setTextColor(Color.WHITE)
+            setTypeface(typeface, Typeface.BOLD)
             layoutParams = LinearLayout.LayoutParams(dp(126), dp(126)).apply { gravity = Gravity.CENTER }
-            elevation = dp(5).toFloat(); isClickable = true; isFocusable = true
+            elevation = dp(5).toFloat()
+            isClickable = true
+            isFocusable = true
+            maxLines = 2
             contentDescription = tr("اتصال با پروتکل انتخاب‌شده", "Connect with selected protocol")
             setOnClickListener {
                 animate().cancel()
                 animate().scaleX(0.94f).scaleY(0.94f).setDuration(80).withEndAction {
                     animate().scaleX(1f).scaleY(1f).setDuration(130).start()
                 }.start()
-                connectSelectedProtocol()
+                onConnectionOrbTapped()
             }
         }
-        selectedCard.addView(orb); selectedCard.addView(gap(15))
+        connectionOrb = orb
+        renderConnectionOrb(connectionUiState)
+        selectedCard.addView(orb); selectedCard.addView(gap(15))        selectedCard.addView(orb); selectedCard.addView(gap(15))
         connectionTimerText = label(tr("مدت اتصال · ۰۰:۰۰:۰۰", "Connected · 00:00:00"), 12f, if (light) Color.rgb(59, 69, 103) else Color.rgb(211, 222, 244), true).apply { gravity = Gravity.CENTER }
         selectedCard.addView(connectionTimerText)
         content.addView(selectedCard); content.addView(gap(13))
@@ -467,6 +500,141 @@ class MainActivity : Activity() {
         val secs = seconds % 60L
         view.text = "مدت اتصال  ·  %02d:%02d:%02d".format(java.util.Locale.ROOT, hours, minutes, secs)
     }
+
+    private fun applyConnectionStateFromMessage(message: String, liveEvent: Boolean = false) {
+        val value = message.trim().lowercase()
+        when {
+            value.contains("در حال قطع") || value.contains("disconnecting") -> {
+                setConnectionUiState(ConnectionUiState.DISCONNECTING)
+            }
+            value.contains("خطای اتصال") || value.contains("خطای psiphon") ||
+                value.contains("ناموفق") || value.contains("تأیید نشد") ||
+                value.contains("برقرار نشد") || value.contains("failed") -> {
+                setConnectionUiState(ConnectionUiState.FAILED)
+            }
+            value.contains("در حال اتصال") || value.contains("در حال راه‌اندازی") ||
+                value.contains("در حال آماده‌سازی") || value.contains("در حال ساخت") ||
+                value.contains("در حال ایجاد") || value.contains("در حال بررسی") ||
+                value.contains("در حال آزمون") || value.contains("در حال شروع") ||
+                value.contains("request sent") || value.contains("connecting") -> {
+                setConnectionUiState(ConnectionUiState.CONNECTING)
+            }
+            value.contains("psiphon متصل شد") || value.contains("متصل ·") ||
+                value.contains("تونل masque برقرار شد") ||
+                value.contains("عبور ترافیک از تونل تأیید شد") ||
+                value.contains("فعال و آزموده شد") || value.contains("tunnel validated") ||
+                value.contains("connected") -> {
+                setConnectionUiState(ConnectionUiState.CONNECTED)
+            }
+            value.contains("اتصال قطع شد") || value == "قطع" ||
+                value.contains("disconnected") || value.contains("ready to connect") ||
+                value.contains("آمادهٔ اتصال") -> {
+                setConnectionUiState(
+                    ConnectionUiState.DISCONNECTED,
+                    showDisconnectedFeedback = liveEvent &&
+                        (value.contains("اتصال قطع شد") || value.contains("disconnected"))
+                )
+            }
+        }
+    }
+
+    private fun setConnectionUiState(
+        state: ConnectionUiState,
+        showDisconnectedFeedback: Boolean = false
+    ) {
+        connectionUiState = state
+        when (state) {
+            ConnectionUiState.CONNECTED -> setConnectionTimerActive(true)
+            ConnectionUiState.DISCONNECTED, ConnectionUiState.FAILED -> setConnectionTimerActive(false)
+            else -> Unit
+        }
+
+        connectionFeedbackRunnable?.let { connectionFeedbackHandler.removeCallbacks(it) }
+        connectionFeedbackRunnable = null
+        connectionPulse?.cancel()
+        connectionPulse = null
+        val orb = connectionOrb
+        if (orb != null) {
+            orb.alpha = 1f
+            renderConnectionOrb(state, disconnectedFeedback = state == ConnectionUiState.DISCONNECTED && showDisconnectedFeedback)
+            if (state == ConnectionUiState.CONNECTING) {
+                connectionPulse = ObjectAnimator.ofFloat(orb, View.ALPHA, 1f, 0.68f).apply {
+                    duration = 650L
+                    repeatMode = ObjectAnimator.REVERSE
+                    repeatCount = ObjectAnimator.INFINITE
+                    start()
+                }
+            }
+        }
+
+        if (state == ConnectionUiState.DISCONNECTED && showDisconnectedFeedback) {
+            val reset = Runnable {
+                if (connectionUiState == ConnectionUiState.DISCONNECTED) {
+                    renderConnectionOrb(ConnectionUiState.DISCONNECTED)
+                }
+                connectionFeedbackRunnable = null
+            }
+            connectionFeedbackRunnable = reset
+            connectionFeedbackHandler.postDelayed(reset, 1900L)
+        }
+    }
+
+    private fun renderConnectionOrb(
+        state: ConnectionUiState,
+        disconnectedFeedback: Boolean = false
+    ) {
+        val orb = connectionOrb ?: return
+        val english = getSharedPreferences("azadlink_ui", MODE_PRIVATE).getString("language", "fa") == "en"
+        val light = getSharedPreferences("azadlink_ui", MODE_PRIVATE).getString("theme", "dark") == "light"
+        val (glyph, label, colors, description) = when {
+            disconnectedFeedback -> Quadruple(
+                "✓",
+                if (english) "Disconnected" else "قطع شد",
+                intArrayOf(Color.rgb(25, 180, 137), Color.rgb(58, 215, 179)),
+                if (english) "VPN disconnected" else "اتصال قطع شد"
+            )
+            state == ConnectionUiState.CONNECTING -> Quadruple(
+                "◌",
+                if (english) "Connecting" else "در حال اتصال",
+                intArrayOf(Color.rgb(126, 88, 255), Color.rgb(48, 185, 206)),
+                if (english) "Connection in progress" else "در حال اتصال"
+            )
+            state == ConnectionUiState.CONNECTED -> Quadruple(
+                "⏻",
+                if (english) "Disconnect" else "قطع اتصال",
+                intArrayOf(Color.rgb(238, 71, 123), Color.rgb(139, 62, 224)),
+                if (english) "Tap to disconnect" else "برای قطع اتصال ضربه بزن"
+            )
+            state == ConnectionUiState.DISCONNECTING -> Quadruple(
+                "◌",
+                if (english) "Disconnecting" else "در حال قطع",
+                intArrayOf(Color.rgb(91, 104, 132), Color.rgb(69, 82, 109)),
+                if (english) "Disconnecting" else "در حال قطع اتصال"
+            )
+            state == ConnectionUiState.FAILED -> Quadruple(
+                "↻",
+                if (english) "Try again" else "تلاش دوباره",
+                intArrayOf(Color.rgb(195, 69, 88), Color.rgb(118, 54, 139)),
+                if (english) "Connection failed; tap to retry" else "اتصال ناموفق؛ برای تلاش دوباره بزن"
+            )
+            else -> Quadruple(
+                "⟡",
+                if (english) "Connect" else "اتصال",
+                intArrayOf(Color.rgb(126, 88, 255), Color.rgb(48, 185, 206)),
+                if (english) "Connect with selected protocol" else "اتصال با پروتکل انتخاب‌شده"
+            )
+        }
+        orb.text = "$glyph\n$label"
+        orb.textSize = if (label.length > 9) 14f else 19f
+        orb.contentDescription = description
+        val border = if (light) Color.argb(100, 55, 64, 89) else Color.argb(105, 255, 255, 255)
+        orb.background = GradientDrawable(GradientDrawable.Orientation.TL_BR, colors).apply {
+            shape = GradientDrawable.OVAL
+            setStroke(dp(3), border)
+        }
+    }
+
+    private data class Quadruple<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
 
     private fun showTunnelLogs() {
         val logs = TunnelBus.readLogs(this).trim().ifBlank { "هنوز گزارشی از موتور Aether ثبت نشده است." }
@@ -509,13 +677,30 @@ class MainActivity : Activity() {
         Protocol.STORM_DNS -> "Storm DNS"
     }
 
+    private fun onConnectionOrbTapped() {
+        when (connectionUiState) {
+            ConnectionUiState.CONNECTING, ConnectionUiState.CONNECTED -> disconnectVpn()
+            ConnectionUiState.DISCONNECTING -> Unit
+            ConnectionUiState.DISCONNECTED, ConnectionUiState.FAILED -> connectSelectedProtocol()
+        }
+    }
+
     private fun connectSelectedProtocol() {
         when (val protocol = selectedProtocol()) {
             Protocol.MASQUE -> requestAutoConnect()
             Protocol.PSIPHON -> requestPsiphonAutoConnect()
             else -> {
                 val profile = profiles.firstOrNull { it.protocol == protocol }
-                if (profile != null) requestConnect(profile) else showProtocolDetail(protocol)
+                if (profile != null) {
+                    requestConnect(profile)
+                } else {
+                    val english = getSharedPreferences("azadlink_ui", MODE_PRIVATE).getString("language", "fa") == "en"
+                    val message = if (english) "Choose or add a server profile for ${protocol.displayName} before connecting." else
+                        "برای اتصال با ${protocol.displayName} ابتدا کانفیگ آن را اضافه کن."
+                    topStatus.text = message
+                    Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+                    showServerProfilesDialog(protocol)
+                }
             }
         }
     }
@@ -559,10 +744,16 @@ class MainActivity : Activity() {
         fun choose(protocol: Protocol, title: String) {
             prefs.edit().putString("selected_protocol", protocol.name).apply()
             selectedProtocolLabel?.text = title
-            selectedProtocolHint?.text = tr("پروتکل انتخاب‌شده", "Selected protocol")
+            selectedProtocolHint?.text = tr(
+                "انتخاب شد · برای اتصال روی دایره بزن",
+                "Selected · tap the circle to connect"
+            )
             dialog.dismiss()
-            if (protocol == Protocol.MASQUE || protocol == Protocol.PSIPHON) showProtocolDetail(protocol)
-            else if (profiles.none { it.protocol == protocol }) showServerProfilesDialog(protocol)
+            Toast.makeText(
+                this@MainActivity,
+                tr("$title انتخاب شد؛ برای اتصال روی دایرهٔ وسط بزن.", "$title selected; tap the center circle to connect."),
+                Toast.LENGTH_SHORT
+            ).show()
         }
         heading("سرور و پراکسی", "Server protocols")
         item("VLESS", "VLESS", "کانفیگ VLESS / Reality / TLS", "VLESS / Reality / TLS profiles", selectedProtocol() == Protocol.VLESS) { choose(Protocol.VLESS, "VLESS") }
