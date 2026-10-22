@@ -220,6 +220,10 @@ class MainActivity : Activity() {
             .getString("country", "") ?: ""
         PsiphonAutoConnector.connect(this, { message ->
             if (::topStatus.isInitialized) topStatus.text = "وضعیت: $message"
+            when {
+                message.contains("متصل شد", true) -> setConnectionTimerActive(true)
+                message.contains("ناموفق", true) || message.contains("آماده نشد", true) -> setConnectionTimerActive(false)
+            }
             if (message.startsWith("خطای Psiphon:")) Toast.makeText(this, message, Toast.LENGTH_LONG).show()
         }, country, false)
     }
@@ -238,6 +242,10 @@ class MainActivity : Activity() {
             .getString("country", "") ?: ""
         PsiphonAutoConnector.connect(this, { message ->
             if (::topStatus.isInitialized) topStatus.text = "وضعیت: $message"
+            when {
+                message.contains("متصل شد", true) -> setConnectionTimerActive(true)
+                message.contains("ناموفق", true) || message.contains("آماده نشد", true) -> setConnectionTimerActive(false)
+            }
             if (message.startsWith("خطای Psiphon:")) Toast.makeText(this, message, Toast.LENGTH_LONG).show()
         }, country, true)
     }
@@ -310,6 +318,7 @@ class MainActivity : Activity() {
     }
 
     private fun disconnectVpn() {
+        setConnectionTimerActive(false)
         AetherAutoConnector.disconnect(this)
         val stopIntent = Intent(this, AzadLinkVpnService::class.java).apply {
             action = AzadLinkVpnService.ACTION_DISCONNECT
@@ -512,7 +521,7 @@ class MainActivity : Activity() {
         header.addView(logo)
         header.addView(brand, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         val settingsButton = TextView(this).apply {
-            text = "⚙"
+            text = "☰"
             textSize = 22f
             gravity = Gravity.CENTER
             setTextColor(Color.WHITE)
@@ -523,7 +532,6 @@ class MainActivity : Activity() {
             )
             isClickable = true
             isFocusable = true
-            text = "☰"
             setOnClickListener { showAppDrawer() }
             contentDescription = "منوی برنامه و مسیریابی"
             layoutParams = LinearLayout.LayoutParams(dp(45), dp(45))
@@ -1056,9 +1064,8 @@ class MainActivity : Activity() {
 
     private fun showProtocolDrawer() {
         val groups = listOf(
-            "پروتکل‌های سروری" to listOf(Protocol.VLESS, Protocol.VMESS, Protocol.TROJAN, Protocol.SHADOWSOCKS, Protocol.WIREGUARD),
+            "پروتکل‌ها و تونل‌های عمومی" to listOf(Protocol.VLESS, Protocol.VMESS, Protocol.TROJAN, Protocol.SHADOWSOCKS, Protocol.WIREGUARD, Protocol.MASQUE),
             "تونل‌های DNS" to listOf(Protocol.DNSTT, Protocol.MASTER_DNS, Protocol.STORM_DNS),
-            "Aether و MASQUE" to listOf(Protocol.MASQUE),
             "اتصال مستقل" to listOf(Protocol.PSIPHON)
         )
         val panel = LinearLayout(this).apply {
