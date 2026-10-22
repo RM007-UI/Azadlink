@@ -61,7 +61,7 @@ object ProtocolParser {
             val obj = runCatching { JsonParser.parseString(line).asJsonObject }.getOrNull() ?: return null
             val declared = obj.get("protocol")?.takeIf { it.isJsonPrimitive }?.asString ?: return null
             val protocol = Protocol.fromScheme(declared) ?: runCatching { Protocol.valueOf(declared.uppercase(Locale.ROOT)) }.getOrNull() ?: return null
-            if (protocol !in setOf(Protocol.MASQUE, Protocol.PSIPHON, Protocol.MASTER_DNS, Protocol.STORM_DNS)) return null
+            if (protocol !in setOf(Protocol.MASQUE, Protocol.PSIPHON, Protocol.DNSTT, Protocol.MASTER_DNS, Protocol.STORM_DNS)) return null
             return ProtocolProfile(protocol = protocol, label = "${protocol.displayName} profile", rawConfig = line)
         }
         if (line.contains("[Interface]", true) && line.contains("[Peer]", true))
