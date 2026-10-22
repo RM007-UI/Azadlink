@@ -161,19 +161,19 @@ class MainActivity : Activity() {
         if (pendingPsiphonAuto) {
             pendingPsiphonAuto = false
             if (resultCode == RESULT_OK) startPsiphonAutoConnect()
-            else Toast.makeText(this, "اجازهٔ VPN داده نشد", Toast.LENGTH_LONG).show()
+            else { setConnectionUiState(ConnectionUiState.DISCONNECTED); Toast.makeText(this, "اجازهٔ VPN داده نشد", Toast.LENGTH_LONG).show() }
             return
         }
         if (pendingAutoConnect) {
             pendingAutoConnect = false
             if (resultCode == RESULT_OK) startAutoConnect()
-            else Toast.makeText(this, "اجازهٔ VPN داده نشد", Toast.LENGTH_LONG).show()
+            else { setConnectionUiState(ConnectionUiState.DISCONNECTED); Toast.makeText(this, "اجازهٔ VPN داده نشد", Toast.LENGTH_LONG).show() }
             return
         }
         val profile = pendingConnectProfile
         pendingConnectProfile = null
         if (resultCode == RESULT_OK && profile != null) startVpn(profile)
-        else Toast.makeText(this, "اجازهٔ VPN داده نشد", Toast.LENGTH_LONG).show()
+        else { setConnectionUiState(ConnectionUiState.DISCONNECTED); Toast.makeText(this, "اجازهٔ VPN داده نشد", Toast.LENGTH_LONG).show() }
     }
     private fun refreshState() {
         val prefs = getSharedPreferences(AzadLinkVpnService.PREFS, MODE_PRIVATE)
@@ -509,7 +509,8 @@ class MainActivity : Activity() {
             }
             value.contains("خطای اتصال") || value.contains("خطای psiphon") ||
                 value.contains("ناموفق") || value.contains("تأیید نشد") ||
-                value.contains("برقرار نشد") || value.contains("failed") -> {
+                value.contains("برقرار نشد") || value.contains("آماده نشد") ||
+                value.contains("timeout") || value.contains("failed") -> {
                 setConnectionUiState(ConnectionUiState.FAILED)
             }
             value.contains("در حال اتصال") || value.contains("در حال راه‌اندازی") ||
@@ -523,7 +524,7 @@ class MainActivity : Activity() {
                 value.contains("تونل masque برقرار شد") ||
                 value.contains("عبور ترافیک از تونل تأیید شد") ||
                 value.contains("فعال و آزموده شد") || value.contains("tunnel validated") ||
-                value.contains("connected") -> {
+                (value.contains("connected") && !value.contains("disconnected")) -> {
                 setConnectionUiState(ConnectionUiState.CONNECTED)
             }
             value.contains("اتصال قطع شد") || value == "قطع" ||
