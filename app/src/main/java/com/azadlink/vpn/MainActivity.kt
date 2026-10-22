@@ -570,16 +570,17 @@ class MainActivity : Activity() {
         item("Trojan", "Trojan", "اتصال مبتنی بر TLS", "TLS-based connection", selectedProtocol() == Protocol.TROJAN) { choose(Protocol.TROJAN, "Trojan") }
         item("Shadowsocks", "Shadowsocks", "پروکسی رمزگذاری‌شده", "Encrypted proxy", selectedProtocol() == Protocol.SHADOWSOCKS) { choose(Protocol.SHADOWSOCKS, "Shadowsocks") }
         item("WireGuard", "WireGuard", "تونل مبتنی بر کلید", "Key-based tunnel", selectedProtocol() == Protocol.WIREGUARD) { choose(Protocol.WIREGUARD, "WireGuard") }
+        item("اتصال زنجیره‌ای · MASQUE → Psiphon", "Chain connection · MASQUE → Psiphon", "اتصال زنجیره‌ای کنار پروتکل‌ها", "Chain connection beside other protocols") {
+            dialog.dismiss(); requestPsiphonChainConnect()
+        }
         heading("تونل‌های DNS", "DNS tunnels")
         item("DNSTT", "DNSTT", "تونل DNS", "DNS tunnel", selectedProtocol() == Protocol.DNSTT) { choose(Protocol.DNSTT, "DNSTT") }
         item("Master DNS", "Master DNS", "موتور MasterDNS", "MasterDNS engine", selectedProtocol() == Protocol.MASTER_DNS) { choose(Protocol.MASTER_DNS, "Master DNS") }
         item("Storm DNS", "Storm DNS", "موتور StormDNS", "StormDNS engine", selectedProtocol() == Protocol.STORM_DNS) { choose(Protocol.STORM_DNS, "Storm DNS") }
-        heading("اتصال‌های خودکار", "Automatic connections")
+        heading("Aether / MASQUE", "Aether / MASQUE")
         item("Aether · MASQUE", "Aether · MASQUE", "اتصال خودکار و تنظیمات پیشرفته", "Automatic connection and advanced options", selectedProtocol() == Protocol.MASQUE) { choose(Protocol.MASQUE, "Aether · MASQUE") }
+        heading("Psiphon", "Psiphon")
         item("Psiphon", "Psiphon", "اتصال مستقیم با موتور همراه برنامه", "Direct connection using the bundled engine", selectedProtocol() == Protocol.PSIPHON) { choose(Protocol.PSIPHON, "Psiphon") }
-        item("اتصال زنجیره‌ای · MASQUE → Psiphon", "Chain connection · MASQUE → Psiphon", "راه‌اندازی زنجیره‌ای دو موتور", "Chain the two tunnel engines") {
-            dialog.dismiss(); requestPsiphonChainConnect()
-        }
         heading("مدیریت", "Manage")
         item("کانفیگ‌ها و سرورها", "Server configurations", "افزودن، اتصال و حذف پروفایل‌ها", "Add, connect and remove profiles") { dialog.dismiss(); showServerProfilesDialog() }
         item("حالت پروکسی", "Proxy mode", "تنظیم پراکسی محلی", "Configure local proxy mode") { dialog.dismiss(); showProxySettings() }
@@ -597,7 +598,7 @@ class MainActivity : Activity() {
             setLayout((resources.displayMetrics.widthPixels * 0.88f).toInt(), ViewGroup.LayoutParams.MATCH_PARENT)
         }
         dialog.setOnShowListener {
-            outer.translationX = dp(28).toFloat(); outer.alpha = 0.92f
+            outer.translationX = (if (english) -dp(28) else dp(28)).toFloat(); outer.alpha = 0.92f
             outer.animate().translationX(0f).alpha(1f).setDuration(190).start()
         }
         dialog.show()
