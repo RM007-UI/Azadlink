@@ -868,12 +868,18 @@ class MainActivity : Activity() {
 
     private fun showMasqueAdvancedSettings() {
         val prefs = getSharedPreferences("azadlink_masque", MODE_PRIVATE)
+        val english = getSharedPreferences("azadlink_ui", MODE_PRIVATE).getString("language", "fa") == "en"
+        val light = getSharedPreferences("azadlink_ui", MODE_PRIVATE).getString("theme", "dark") == "light"
+        fun tr(fa: String, en: String) = if (english) en else fa
+        val fg = if (light) Color.rgb(26, 33, 51) else Color.WHITE
+        val muted = if (light) Color.rgb(85, 98, 121) else Color.rgb(159, 171, 197)
+        val fieldBg = if (light) Color.rgb(246, 248, 253) else Color.rgb(23, 29, 48)
         val panel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(20), dp(10), dp(20), dp(8))
         }
         fun addLabel(value: String) {
-            panel.addView(text(value, 13, Color.rgb(186, 196, 218), true))
+            panel.addView(text(value, 13, fg, true))
             panel.addView(space(4))
         }
         fun spinner(items: List<String>, selected: Int): android.widget.Spinner {
@@ -887,76 +893,76 @@ class MainActivity : Activity() {
             }
         }
 
-        addLabel("انتقال MASQUE")
+        addLabel(tr("انتقال MASQUE", "MASQUE transport"))
         val transportSpinner = spinner(
-            listOf("HTTP/2 · مناسب شبکه‌های محدود", "HTTP/3 · حالت سریع‌تر"),
+            listOf(tr("HTTP/2 · مناسب شبکه‌های محدود", "HTTP/2 · better for restricted networks"), tr("HTTP/3 · حالت سریع‌تر", "HTTP/3 · faster mode")),
             if ((prefs.getString("transport", "h2") ?: "h2") == "h2") 0 else 1
         )
         panel.addView(transportSpinner)
         panel.addView(space(10))
 
-        addLabel("حالت اسکن gateway")
+        addLabel(tr("حالت اسکن gateway", "Gateway scan mode"))
         val scanModes = listOf("turbo", "balanced", "thorough", "stealth", "ironclad")
         val currentScan = prefs.getString("scan_mode", "balanced") ?: "balanced"
         val scanSpinner = spinner(scanModes, scanModes.indexOf(currentScan))
         panel.addView(scanSpinner)
         panel.addView(text(
-            "turbo سریع‌تر است؛ balanced متعادل است؛ thorough محدودهٔ بیشتری را بررسی می‌کند؛ stealth آهسته‌تر است؛ ironclad برای بررسی سخت‌گیرانه‌تر طراحی شده است.",
-            11, Color.rgb(159, 171, 197)
+            tr("turbo سریع‌تر است؛ balanced متعادل است؛ thorough محدودهٔ بیشتری را بررسی می‌کند؛ stealth آهسته‌تر است؛ ironclad برای بررسی سخت‌گیرانه‌تر طراحی شده است.", "turbo is faster; balanced is the default compromise; thorough checks more candidates; stealth is slower; ironclad is stricter."),
+            11, muted
         ))
         panel.addView(space(10))
 
-        addLabel("پروفایل استتار")
+        addLabel(tr("پروفایل استتار", "Obfuscation profile"))
         val noiseModes = listOf("firewall", "gfw", "off")
         val currentNoise = prefs.getString("obfuscation", "firewall") ?: "firewall"
         val noiseSpinner = spinner(noiseModes, noiseModes.indexOf(currentNoise))
         panel.addView(noiseSpinner)
         panel.addView(space(10))
 
-        addLabel("نسخهٔ IP")
+        addLabel(tr("نسخهٔ IP", "IP version"))
         val ipSpinner = spinner(
-            listOf("دوگانه · IPv4 + IPv6", "فقط IPv4", "فقط IPv6"),
+            listOf(tr("دوگانه · IPv4 + IPv6", "Dual · IPv4 + IPv6"), tr("فقط IPv4", "IPv4 only"), tr("فقط IPv6", "IPv6 only")),
             when (prefs.getString("ip_version", "both")) { "v4" -> 1; "v6" -> 2; else -> 0 }
         )
         panel.addView(ipSpinner)
         panel.addView(space(10))
 
-        addLabel("نام سرور TLS (SNI)")
+        addLabel(tr("نام سرور TLS (SNI)", "TLS server name (SNI)"))
         val sniInput = EditText(this).apply {
             setSingleLine(true)
             setText(prefs.getString("sni", "www.cloudflare.com") ?: "www.cloudflare.com")
-            setTextColor(Color.WHITE)
-            setHintTextColor(Color.rgb(111, 123, 149))
+            setTextColor(fg)
+            setHintTextColor(muted)
             hint = "www.cloudflare.com"
             textSize = 14f
             setPadding(dp(12), dp(10), dp(12), dp(10))
-            background = rounded(Color.rgb(23, 29, 48), 12)
+            background = rounded(fieldBg, 12)
         }
         panel.addView(sniInput)
         panel.addView(space(10))
 
-        addLabel("درگاه دستی (اختیاری)")
+        addLabel(tr("درگاه دستی (اختیاری)", "Manual endpoint (optional)"))
         val endpointInput = EditText(this).apply {
             setSingleLine(true)
             setText(prefs.getString("endpoint", "") ?: "")
-            setTextColor(Color.WHITE)
-            setHintTextColor(Color.rgb(111, 123, 149))
-            hint = "مثلاً 162.159.198.64:443"
+            setTextColor(fg)
+            setHintTextColor(muted)
+            hint = if (english) "e.g. 162.159.198.64:443" else "مثلاً 162.159.198.64:443"
             textSize = 14f
             setPadding(dp(12), dp(10), dp(12), dp(10))
-            background = rounded(Color.rgb(23, 29, 48), 12)
+            background = rounded(fieldBg, 12)
         }
         panel.addView(endpointInput)
         panel.addView(text(
-            "خالی بگذار تا اسکن خودکار انجام شود. درگاه دستی ممکن است تغییر کند؛ اگر جواب ندهد، تلاش جایگزین دوباره اسکن می‌کند.",
+            tr("خالی بگذار تا اسکن خودکار انجام شود. درگاه دستی ممکن است تغییر کند؛ اگر جواب ندهد، تلاش جایگزین دوباره اسکن می‌کند.", "Leave blank for automatic scanning. Manual endpoints can change; fallback may rescan if one fails."),
             11, Color.rgb(159, 171, 197)
         ))
         panel.addView(space(6))
 
         val fragmentCheck = android.widget.CheckBox(this).apply {
-            text = "فرگمنت ClientHello (فقط در HTTP/2)"
+            text = tr("فرگمنت ClientHello (فقط در HTTP/2)", "ClientHello fragmentation (HTTP/2 only)")
             textSize = 12f
-            setTextColor(Color.WHITE)
+            setTextColor(fg)
             buttonTintList = android.content.res.ColorStateList.valueOf(Color.rgb(132, 103, 255))
             isChecked = prefs.getBoolean("fragment", false)
         }
@@ -964,28 +970,28 @@ class MainActivity : Activity() {
         panel.addView(space(3))
 
         val fallbackCheck = android.widget.CheckBox(this).apply {
-            text = "اگر اسکن شکست خورد، یک بار با اسکن عمیق‌تر تلاش کن"
+            text = tr("اگر اسکن شکست خورد، یک بار با اسکن عمیق‌تر تلاش کن", "Retry once with a deeper scan if the first scan fails")
             textSize = 12f
-            setTextColor(Color.WHITE)
+            setTextColor(fg)
             buttonTintList = android.content.res.ColorStateList.valueOf(Color.rgb(132, 103, 255))
             isChecked = prefs.getBoolean("auto_fallback", true)
         }
         panel.addView(fallbackCheck)
         panel.addView(space(8))
         panel.addView(text(
-            "تلاش جایگزین ممکن است چند دقیقه طول بکشد و موفقیت اتصال را تضمین نمی‌کند. تنظیمات فقط روی اتصال بعدی اعمال می‌شوند.",
+            tr("تلاش جایگزین ممکن است چند دقیقه طول بکشد و موفقیت اتصال را تضمین نمی‌کند. تنظیمات فقط روی اتصال بعدی اعمال می‌شوند.", "Fallback may take several minutes and cannot guarantee a connection. Settings apply to the next connection."),
             11, Color.rgb(159, 171, 197)
         ))
         AlertDialog.Builder(this)
-            .setTitle("تنظیمات پیشرفتهٔ MASQUE")
+            .setTitle(tr("تنظیمات پیشرفتهٔ MASQUE", "Advanced MASQUE settings"))
             .setView(ScrollView(this).apply { addView(panel) })
-            .setNegativeButton("لغو", null)
-            .setPositiveButton("ذخیره") { _, _ ->
+            .setNegativeButton(tr("لغو", "Cancel"), null)
+            .setPositiveButton(tr("ذخیره", "Save")) { _, _ ->
                 val endpointValue = endpointInput.text?.toString()?.trim().orEmpty()
                 if (endpointValue.isNotBlank()) {
                     val endpointPort = endpointValue.substringAfterLast(':', "").toIntOrNull()
                     if (!endpointValue.contains(':') || endpointPort == null || endpointPort !in 1..65535 || endpointValue.any { it.isWhitespace() }) {
-                        Toast.makeText(this, "درگاه باید به شکل host:port باشد؛ مثلاً 162.159.198.64:443", Toast.LENGTH_LONG).show()
+                        Toast.makeText(this, tr("درگاه باید به شکل host:port باشد؛ مثلاً 162.159.198.64:443", "Endpoint must be host:port, e.g. 162.159.198.64:443"), Toast.LENGTH_LONG).show()
                         return@setPositiveButton
                     }
                 }
@@ -1001,7 +1007,7 @@ class MainActivity : Activity() {
                     .putBoolean("fragment", fragmentCheck.isChecked)
                     .putBoolean("auto_fallback", fallbackCheck.isChecked)
                     .apply()
-                Toast.makeText(this, "تنظیمات MASQUE ذخیره شد؛ برای اعمال، دوباره وصل شو.", Toast.LENGTH_LONG).show()
+                Toast.makeText(this, tr("تنظیمات MASQUE ذخیره شد؛ برای اعمال، دوباره وصل شو.", "MASQUE settings saved. Reconnect to apply them."), Toast.LENGTH_LONG).show()
             }
             .show()
     }
