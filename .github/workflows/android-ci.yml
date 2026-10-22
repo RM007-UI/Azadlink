@@ -232,17 +232,17 @@ jobs:
             (
               github.ref == 'refs/heads/feature/aether-masque-autoconnect' &&
               github.event_name == 'push' &&
-              github.event.head_commit.message == 'Publish AzadLink v0.9.2 release'
+              github.event.head_commit.message == 'Publish AzadLink v0.9.3 release'
             )
           )
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'v0.9.2' }}
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'v0.9.3' }}
           target_commitish: ${{ github.sha }}
           prerelease: ${{ !startsWith(github.ref, 'refs/tags/v') }}
-          name: AzadLink v0.9.2
+          name: AzadLink v0.9.3
           body: |
-            AzadLink v0.9.2 release candidate.
+            AzadLink v0.9.3 release candidate.
 
             Includes a pinned Psiphon ConsoleClient build and a CI check for the previously reported FRONTED-MEEK-CDN-OSSH protocol error. MASQUE HTTP/2 support is included.
 
