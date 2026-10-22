@@ -99,8 +99,9 @@ object AetherAutoConnector {
                     (masquePrefs.getString("sni", "www.cloudflare.com")?.trim()?.takeIf { it.isNotEmpty() } ?: "www.cloudflare.com")
                 val manualEndpoint = if (automatic) "" else masquePrefs.getString("endpoint", "")?.trim().orEmpty()
 
-                fun startAttempt(attemptScanMode: String, fallbackAttempt: Boolean) {
+                fun startAttempt(attemptScanMode: String, fallbackAttempt: Boolean, attemptTransport: String = transport) {
                     if (connectionGeneration.get() != generation) return
+                    val attemptFragment = fragment && attemptTransport == "h2"
                     val arguments = mutableListOf(
                         "--bind", "127.0.0.1:" + SOCKS_PORT,
                         "--http-proxy", "127.0.0.1:" + HTTP_PORT,
@@ -113,13 +114,13 @@ object AetherAutoConnector {
                         "--masque",
                         "--masque-sni", masqueSni
                     )
-                    if (transport == "h2") arguments.add("--h2")
-                    if (fragment) arguments.add("--fragment")
+                    if (attemptTransport == "h2") arguments.add("--h2")
+                    if (attemptFragment) arguments.add("--fragment")
 
                     val settings = mapOf<String, Any?>(
                         "protocol" to "masque",
-                        "modeLabel" to ("MASQUE " + transport.uppercase()),
-                        "transport" to transport,
+                        "modeLabel" to ("MASQUE " + attemptTransport.uppercase()),
+                        "transport" to attemptTransport,
                         "scanMode" to attemptScanMode,
                         "obfuscation" to obfuscation,
                         "noizeProfile" to obfuscation,
@@ -129,7 +130,7 @@ object AetherAutoConnector {
                         "socksPort" to SOCKS_PORT,
                         "tunnelMtu" to 1500,
                         "coreMtu" to 0,
-                        "fragment" to fragment,
+                        "fragment" to attemptFragment,
                         "allowLan" to false,
                         "proxyOnly" to routingPrefs.getBoolean("proxy_only", false),
                         "quickReconnect" to true,
@@ -149,14 +150,23 @@ object AetherAutoConnector {
                         mainHandler.removeCallbacks(watchdog)
                         TunnelBus.removeStatusListener(statusListener)
                         if (!fallbackAttempt && autoFallback) {
+                            // A gateway may pass TCP/TLS probing but reject HTTP/2 CONNECT-IP.
+                            // In automatic mode, retry with HTTP/3 instead of repeating H2.
+                            val nextTransport = if (automatic && attemptTransport == "h2") "h3" else attemptTransport
+                            val nextScanMode = if (automatic && attemptTransport == "h2") attemptScanMode else fallbackScanMode
+                            val fallbackDescription = if (nextTransport != attemptTransport) {
+                                "انتقال جایگزین ${nextTransport.uppercase()} با اسکن «$nextScanMode»"
+                            } else {
+                                "اسکن جایگزین «$nextScanMode»"
+                            }
                             onStatusOnMain(
                                 onStatus,
-                                "$reason؛ در حال توقف تلاش فعلی و شروع اسکن جایگزین «$fallbackScanMode»…"
+                                "$reason؛ در حال توقف تلاش فعلی و شروع $fallbackDescription…"
                             )
                             AetherVpnService.stop(appContext)
                             mainHandler.postDelayed({
                                 if (connectionGeneration.get() == generation) {
-                                    startAttempt(fallbackScanMode, true)
+                                    startAttempt(nextScanMode, true, nextTransport)
                                 }
                             }, 2200L)
                         } else {
@@ -182,7 +192,7 @@ object AetherAutoConnector {
                                         mainHandler.removeCallbacks(watchdog)
                                         TunnelBus.removeStatusListener(statusListener)
                                         val prefix = if (fallbackAttempt) "تونل MASQUE در تلاش جایگزین برقرار شد." else "تونل MASQUE برقرار شد."
-                                        onStatusOnMain(onStatus, prefix + " انتقال " + transport.uppercase() + "؛ پراکسی موتور پاسخ داد و رابط VPN برقرار شد.")
+                                        onStatusOnMain(onStatus, prefix + " انتقال " + attemptTransport.uppercase() + "؛ پراکسی موتور پاسخ داد و رابط VPN برقرار شد.")
                                     }
                                 }
                                 TunnelStage.FAILED -> {
