@@ -1,6 +1,8 @@
 package com.azadlink.vpn
 
 import android.app.Activity
+import android.animation.ObjectAnimator
+import android.animation.PropertyValuesHolder
 import android.app.AlertDialog
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -48,6 +50,8 @@ class MainActivity : Activity() {
     private var pendingPsiphonAuto = false
     private var pendingPsiphonChain = false
     private var receiverRegistered = false
+    private var selectedProtocolLabel: TextView? = null
+    private var selectedProtocolHint: TextView? = null
     private val tunnelStatusListener: (TunnelSnapshot) -> Unit = { snapshot ->
         runOnUiThread {
             if (::topStatus.isInitialized) {
@@ -294,15 +298,17 @@ class MainActivity : Activity() {
         topStatus.text = "وضعیت: درخواست قطع اتصال ارسال شد"
     }
     private fun buildUi() {
-        val bg = Color.rgb(7, 10, 19)
-        val surface = Color.rgb(17, 23, 38)
-        val raised = Color.rgb(23, 31, 49)
-        val elevated = Color.rgb(29, 38, 59)
-        val accent = Color.rgb(129, 100, 255)
-        val accent2 = Color.rgb(73, 199, 220)
-        val mint = Color.rgb(95, 224, 184)
-        val muted = Color.rgb(152, 166, 192)
-        val stroke = Color.rgb(44, 55, 78)
+        val lightTheme = getSharedPreferences("azadlink_ui", MODE_PRIVATE).getString("theme", "dark") == "light"
+        val bg = if (lightTheme) Color.rgb(242, 245, 251) else Color.rgb(7, 10, 19)
+        val surface = if (lightTheme) Color.WHITE else Color.rgb(17, 23, 38)
+        val raised = if (lightTheme) Color.rgb(232, 237, 247) else Color.rgb(23, 31, 49)
+        val elevated = if (lightTheme) Color.rgb(222, 229, 243) else Color.rgb(29, 38, 59)
+        val accent = Color.rgb(109, 84, 235)
+        val accent2 = Color.rgb(48, 155, 181)
+        val mint = Color.rgb(38, 163, 125)
+        val muted = if (lightTheme) Color.rgb(87, 101, 127) else Color.rgb(152, 166, 192)
+        val stroke = if (lightTheme) Color.rgb(205, 214, 231) else Color.rgb(44, 55, 78)
+        val mainText = if (lightTheme) Color.rgb(24, 31, 48) else Color.WHITE
 
         window.statusBarColor = bg
         window.navigationBarColor = bg
@@ -375,7 +381,7 @@ class MainActivity : Activity() {
                 orientation = LinearLayout.VERTICAL
                 setPadding(dp(9), 0, 0, 0)
             }
-            labelInto(copy, title, 15, Color.WHITE, true)
+            labelInto(copy, title, 15, mainText, true)
             if (!subtitle.isNullOrBlank()) {
                 spaceInto(copy, 3)
                 labelInto(copy, subtitle, 11, muted)
@@ -497,7 +503,7 @@ class MainActivity : Activity() {
             )
             isClickable = true
             isFocusable = true
-            setOnClickListener { showRoutingSettings() }
+            setOnClickListener { showAppSettings() }
             layoutParams = LinearLayout.LayoutParams(dp(45), dp(45))
         }
         header.addView(settingsButton)
@@ -564,8 +570,96 @@ class MainActivity : Activity() {
         }
 
         addPage { page ->
-            pageHeading(page, "پروتکل‌های سروری", "پروفایل‌هات رو وارد کن و موتور مناسب رو انتخاب کن", "PROXY PROTOCOLS")
-            sectionTitle(page, "انتخاب پروتکل", "VLESS، VMess، Trojan و Shadowsocks")
+            pageHeading(page, "اتصال", "پروتکل را انتخاب کن و دکمهٔ بزرگ اتصال را بزن", "AZADLINK · SMART TUNNEL")
+            val connectHero = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER
+                setPadding(dp(18), dp(18), dp(18), dp(18))
+                background = GradientDrawable(
+                    GradientDrawable.Orientation.TL_BR,
+                    if (lightTheme) intArrayOf(Color.rgb(224, 226, 255), Color.rgb(218, 243, 248))
+                    else intArrayOf(Color.rgb(45, 37, 91), Color.rgb(20, 58, 76))
+                ).apply {
+                    cornerRadius = dp(26).toFloat()
+                    setStroke(dp(1), if (lightTheme) Color.rgb(191, 196, 245) else Color.rgb(72, 76, 133))
+                }
+                elevation = dp(3).toFloat()
+            }
+            selectedProtocolLabel = TextView(this).apply {
+                text = selectedProtocolName()
+                textSize = 16f
+                gravity = Gravity.CENTER
+                setTextColor(mainText)
+                setTypeface(typeface, Typeface.BOLD)
+                includeFontPadding = false
+            }
+            selectedProtocolHint = TextView(this).apply {
+                text = "پروتکل انتخاب‌شده"
+                textSize = 12f
+                gravity = Gravity.CENTER
+                setTextColor(muted)
+                setPadding(0, dp(4), 0, dp(10))
+            }
+            val connectOrb = TextView(this).apply {
+                text = "⟡\nاتصال"
+                textSize = 20f
+                gravity = Gravity.CENTER
+                setTextColor(Color.WHITE)
+                setTypeface(typeface, Typeface.BOLD)
+                background = GradientDrawable(
+                    GradientDrawable.Orientation.TL_BR,
+                    intArrayOf(Color.rgb(126, 88, 255), Color.rgb(48, 185, 206))
+                ).apply { shape = GradientDrawable.OVAL; setStroke(dp(3), Color.argb(80, 255, 255, 255)) }
+                elevation = dp(9).toFloat()
+                layoutParams = LinearLayout.LayoutParams(dp(128), dp(128)).apply { gravity = Gravity.CENTER }
+                isClickable = true
+                isFocusable = true
+                contentDescription = "اتصال با پروتکل انتخاب‌شده"
+                setOnClickListener {
+                    animate().cancel()
+                    animate().scaleX(0.94f).scaleY(0.94f).setDuration(85).withEndAction {
+                        animate().scaleX(1f).scaleY(1f).setDuration(130).start()
+                    }.start()
+                    connectSelectedProtocol()
+                }
+            }
+            ObjectAnimator.ofPropertyValuesHolder(
+                connectOrb,
+                PropertyValuesHolder.ofFloat(View.SCALE_X, 1f, 1.035f),
+                PropertyValuesHolder.ofFloat(View.SCALE_Y, 1f, 1.035f)
+            ).apply { duration = 1500; repeatCount = ObjectAnimator.INFINITE; repeatMode = ObjectAnimator.REVERSE; start() }
+            connectHero.addView(selectedProtocolHint)
+            connectHero.addView(connectOrb)
+            val chooseProtocol = TextView(this).apply {
+                text = "☷   انتخاب پروتکل"
+                textSize = 14f
+                gravity = Gravity.CENTER
+                setTextColor(Color.WHITE)
+                setTypeface(typeface, Typeface.BOLD)
+                background = GradientDrawable().apply {
+                    setColor(if (lightTheme) Color.rgb(84, 77, 180) else Color.rgb(67, 57, 126))
+                    cornerRadius = dp(15).toFloat()
+                }
+                setPadding(dp(20), dp(12), dp(20), dp(12))
+                isClickable = true
+                isFocusable = true
+                setOnClickListener { showProtocolDrawer() }
+                layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                    topMargin = dp(14)
+                }
+            }
+            connectHero.addView(chooseProtocol)
+            val connectionHelp = TextView(this).apply {
+                text = "اگر هنوز کانفیگی نداری، پروتکل را انتخاب کن تا راهنمای افزودن آن باز شود."
+                textSize = 11f
+                gravity = Gravity.CENTER
+                setTextColor(muted)
+                setPadding(0, dp(12), 0, 0)
+            }
+            connectHero.addView(connectionHelp)
+            page.addView(connectHero)
+            spaceInto(page, 20)
+            sectionTitle(page, "پروتکل‌های سروری", "VLESS، VMess، Trojan و Shadowsocks")
             actionCard(page, "V", "VLESS", "پشتیبانی از لینک‌های VLESS و Reality/TLS", { showProtocolDetail(Protocol.VLESS) }, Color.rgb(105, 81, 223))
             actionCard(page, "M", "VMess", "ورود لینک و اجرای کانفیگ با Xray", { showProtocolDetail(Protocol.VMESS) }, Color.rgb(56, 130, 211))
             actionCard(page, "T", "Trojan", "اتصال مبتنی بر TLS", { showProtocolDetail(Protocol.TROJAN) }, Color.rgb(35, 150, 135))
@@ -660,7 +754,7 @@ class MainActivity : Activity() {
             heroTop.addView(miniCopy)
             hero.addView(heroTop)
             spaceInto(hero, 19)
-            labelInto(hero, "اتصال امن، با تنظیمات خودت", 21, Color.WHITE, true)
+            labelInto(hero, "اتصال امن، با تنظیمات خودت", 21, mainText, true)
             spaceInto(hero, 6)
             labelInto(hero, "اسکن gateway، نسخهٔ IP، SNI و پروفایل استتار را از تنظیمات پیشرفته کنترل کن.", 12, Color.rgb(206, 209, 234))
             spaceInto(hero, 17)
@@ -744,7 +838,7 @@ class MainActivity : Activity() {
             }
             hero.addView(emblem)
             spaceInto(hero, 14)
-            labelInto(hero, "اتصال خودکار Psiphon", 21, Color.WHITE, true)
+            labelInto(hero, "اتصال خودکار Psiphon", 21, mainText, true)
             spaceInto(hero, 6)
             labelInto(hero, "هستهٔ Psiphon همراه برنامه اجرا می‌شود. بعد از شروع، وضعیت آمادگی تونل و آزمون پراکسی در گزارش ثبت می‌شود.", 12, Color.rgb(198, 209, 222))
             spaceInto(hero, 17)
@@ -864,6 +958,148 @@ class MainActivity : Activity() {
                 clipboard.setPrimaryClip(android.content.ClipData.newPlainText("AzadLink logs", logs))
                 Toast.makeText(this, "گزارش کپی شد.", Toast.LENGTH_LONG).show()
             }
+    }
+
+    private fun selectedProtocol(): Protocol {
+        val saved = getSharedPreferences("azadlink_ui", MODE_PRIVATE).getString("selected_protocol", "MASQUE") ?: "MASQUE"
+        return runCatching { Protocol.valueOf(saved) }.getOrDefault(Protocol.MASQUE)
+    }
+
+    private fun selectedProtocolName(): String = when (selectedProtocol()) {
+        Protocol.MASQUE -> "Aether · MASQUE"
+        Protocol.PSIPHON -> "Psiphon"
+        Protocol.VLESS -> "VLESS"
+        Protocol.VMESS -> "VMess"
+        Protocol.TROJAN -> "Trojan"
+        Protocol.SHADOWSOCKS -> "Shadowsocks"
+        Protocol.WIREGUARD -> "WireGuard"
+        Protocol.DNSTT -> "DNSTT"
+        Protocol.MASTER_DNS -> "Master DNS"
+        Protocol.STORM_DNS -> "Storm DNS"
+    }
+
+    private fun connectSelectedProtocol() {
+        when (val protocol = selectedProtocol()) {
+            Protocol.MASQUE -> requestAutoConnect()
+            Protocol.PSIPHON -> requestPsiphonAutoConnect()
+            else -> {
+                val profile = profiles.firstOrNull { it.protocol == protocol }
+                if (profile != null) requestConnect(profile) else showProtocolDetail(protocol)
+            }
+        }
+    }
+
+    private fun showProtocolDrawer() {
+        val groups = listOf(
+            "پروتکل‌های سروری" to listOf(Protocol.VLESS, Protocol.VMESS, Protocol.TROJAN, Protocol.SHADOWSOCKS, Protocol.WIREGUARD),
+            "تونل‌های DNS" to listOf(Protocol.DNSTT, Protocol.MASTER_DNS, Protocol.STORM_DNS),
+            "Aether و MASQUE" to listOf(Protocol.MASQUE),
+            "اتصال مستقل" to listOf(Protocol.PSIPHON)
+        )
+        val panel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(10), dp(16), dp(10))
+        }
+        val dialog = AlertDialog.Builder(this).setTitle("انتخاب پروتکل").setNegativeButton("بستن", null).create()
+        groups.forEach { (heading, protocols) ->
+            panel.addView(text(heading, 14, Color.rgb(155, 137, 255), true))
+            panel.addView(space(5))
+            protocols.forEach { protocol ->
+                val title = when (protocol) {
+                    Protocol.MASQUE -> "Aether · MASQUE"
+                    Protocol.PSIPHON -> "Psiphon"
+                    Protocol.VLESS -> "VLESS"
+                    Protocol.VMESS -> "VMess"
+                    Protocol.TROJAN -> "Trojan"
+                    Protocol.SHADOWSOCKS -> "Shadowsocks"
+                    Protocol.WIREGUARD -> "WireGuard"
+                    Protocol.DNSTT -> "DNSTT"
+                    Protocol.MASTER_DNS -> "Master DNS"
+                    Protocol.STORM_DNS -> "Storm DNS"
+                }
+                val row = TextView(this).apply {
+                    text = (if (selectedProtocol() == protocol) "✓   " else "◇   ") + title
+                    textSize = 14f
+                    setTextColor(if (selectedProtocol() == protocol) Color.rgb(135, 112, 255) else Color.WHITE)
+                    setPadding(dp(13), dp(13), dp(13), dp(13))
+                    background = GradientDrawable().apply {
+                        setColor(Color.rgb(23, 30, 48))
+                        cornerRadius = dp(14).toFloat()
+                        setStroke(dp(1), Color.rgb(48, 58, 83))
+                    }
+                    isClickable = true
+                    isFocusable = true
+                    setOnClickListener {
+                        getSharedPreferences("azadlink_ui", MODE_PRIVATE).edit().putString("selected_protocol", protocol.name).apply()
+                        selectedProtocolLabel?.text = title
+                        selectedProtocolHint?.text = "پروتکل انتخاب‌شده"
+                        Toast.makeText(this@MainActivity, "پروتکل انتخاب شد: $title", Toast.LENGTH_SHORT).show()
+                        dialog.dismiss()
+                        if (protocol != Protocol.MASQUE && protocol != Protocol.PSIPHON && profiles.none { it.protocol == protocol }) {
+                            showProtocolDetail(protocol)
+                        }
+                    }
+                }
+                panel.addView(row)
+                panel.addView(space(6))
+            }
+            panel.addView(space(7))
+        }
+        dialog.setView(ScrollView(this).apply { addView(panel) })
+        dialog.show()
+    }
+
+    private fun showAppSettings() {
+        val prefs = getSharedPreferences("azadlink_ui", MODE_PRIVATE)
+        val panel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(18), dp(8), dp(18), dp(10))
+        }
+        panel.addView(text("ظاهر برنامه", 14, Color.rgb(155, 137, 255), true))
+        val themeSpinner = android.widget.Spinner(this).apply {
+            adapter = android.widget.ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, listOf("تاریک · مدرن", "روشن · ساده"))
+            setSelection(if (prefs.getString("theme", "dark") == "light") 1 else 0)
+        }
+        panel.addView(themeSpinner)
+        panel.addView(space(12))
+        panel.addView(text("زبان رابط کاربری", 14, Color.rgb(155, 137, 255), true))
+        val languageSpinner = android.widget.Spinner(this).apply {
+            adapter = android.widget.ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, listOf("فارسی", "English (آزمایشی)"))
+            setSelection(if (prefs.getString("language", "fa") == "en") 1 else 0)
+        }
+        panel.addView(languageSpinner)
+        panel.addView(space(8))
+        panel.addView(text("زبان انگلیسی در این نسخه آزمایشی است؛ ممکن است بعضی متن‌های ثابت و گزارش موتور همچنان فارسی باشند.", 11, Color.rgb(159, 171, 197)))
+        panel.addView(space(16))
+        panel.addView(text("دربارهٔ سازنده", 15, Color.rgb(155, 137, 255), true))
+        panel.addView(space(4))
+        panel.addView(text("سازنده: رضا", 13, Color.WHITE, true))
+        panel.addView(text("AzadLink یک کلاینت اندرویدی برای مدیریت و اجرای چند موتور تونل و پروکسی در یک رابط ساده است. پشتیبانی واقعی هر پروتکل به کانفیگ، شبکه و وضعیت موتور مربوط بستگی دارد.", 12, Color.rgb(177, 188, 207)))
+        val repoLink = TextView(this).apply {
+            text = "↗  github.com/RM007-UI/Azadlink"
+            textSize = 13f
+            setTextColor(Color.rgb(113, 190, 255))
+            setPadding(0, dp(10), 0, dp(6))
+            isClickable = true
+            isFocusable = true
+            setOnClickListener {
+                runCatching { startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/RM007-UI/Azadlink"))) }
+                    .onFailure { Toast.makeText(this@MainActivity, "بازکردن GitHub ناموفق بود", Toast.LENGTH_SHORT).show() }
+            }
+        }
+        panel.addView(repoLink)
+        AlertDialog.Builder(this)
+            .setTitle("تنظیمات AzadLink")
+            .setView(ScrollView(this).apply { addView(panel) })
+            .setNegativeButton("لغو", null)
+            .setPositiveButton("ذخیره") { _, _ ->
+                val newTheme = if (themeSpinner.selectedItemPosition == 1) "light" else "dark"
+                val language = if (languageSpinner.selectedItemPosition == 1) "en" else "fa"
+                prefs.edit().putString("theme", newTheme).putString("language", language).apply()
+                Toast.makeText(this, "تنظیمات ذخیره شد؛ برای اعمال تم، صفحه دوباره ساخته می‌شود.", Toast.LENGTH_SHORT).show()
+                recreate()
+            }
+            .show()
     }
 
     private fun showRoutingSettings() {
