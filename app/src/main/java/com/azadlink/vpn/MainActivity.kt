@@ -839,7 +839,7 @@ private fun refreshState() {
         }
         panel.addView(languageSpinner); panel.addView(space(15))
         panel.addView(text(tr("دربارهٔ برنامه", "About AzadLink"), 15, Color.rgb(133, 109, 255), true))
-        panel.addView(space(4)); panel.addView(text(tr("نویسنده: RM007", "Author: RM007"), 14, fg, true))
+        panel.addView(space(4)); panel.addView(text(tr("سازنده: رضا · RM007", "Creator: Reza · RM007"), 14, fg, true))
         panel.addView(text(tr("AzadLink کلاینت اندرویدی برای مدیریت چند موتور تونل و پروکسی است. کارکرد هر پروتکل به نسخهٔ موتور، کانفیگ و شبکه بستگی دارد.",
             "AzadLink is an Android client for managing tunnel and proxy engines. Each protocol depends on engine compatibility, configuration and network conditions."), 12, muted))
         val repoLink = TextView(this).apply {
