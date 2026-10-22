@@ -628,6 +628,7 @@ class MainActivity : Activity() {
                 PropertyValuesHolder.ofFloat(View.SCALE_X, 1f, 1.035f),
                 PropertyValuesHolder.ofFloat(View.SCALE_Y, 1f, 1.035f)
             ).apply { duration = 1500; repeatCount = ObjectAnimator.INFINITE; repeatMode = ObjectAnimator.REVERSE; start() }
+            connectHero.addView(selectedProtocolLabel)
             connectHero.addView(selectedProtocolHint)
             connectHero.addView(connectOrb)
             val chooseProtocol = TextView(this).apply {
