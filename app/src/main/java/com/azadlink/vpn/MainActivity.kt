@@ -459,7 +459,7 @@ class MainActivity : Activity() {
         }
         connectionOrb = orb
         renderConnectionOrb(connectionUiState)
-        selectedCard.addView(orb); selectedCard.addView(gap(15))        selectedCard.addView(orb); selectedCard.addView(gap(15))
+        selectedCard.addView(orb); selectedCard.addView(gap(15))
         connectionTimerText = label(tr("مدت اتصال · ۰۰:۰۰:۰۰", "Connected · 00:00:00"), 12f, if (light) Color.rgb(59, 69, 103) else Color.rgb(211, 222, 244), true).apply { gravity = Gravity.CENTER }
         selectedCard.addView(connectionTimerText)
         content.addView(selectedCard); content.addView(gap(13))
