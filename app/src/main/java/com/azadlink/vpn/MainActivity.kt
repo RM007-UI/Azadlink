@@ -550,7 +550,7 @@ class MainActivity : Activity() {
                     cornerRadius = dp(13).toFloat()
                     setStroke(dp(1), if (selected) accent else if (light) Color.rgb(215, 221, 235) else Color.rgb(45, 55, 77))
                 }
-                isClickable = true; isFocusable = true; setOnClickListener(action)
+                isClickable = true; isFocusable = true; setOnClickListener { action() }
             }
             row.addView(text((if (selected) "✓  " else "") + tr(fa, en), 14, fg, true))
             row.addView(text(tr(subFa, subEn), 11, muted))
