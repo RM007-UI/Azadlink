@@ -255,17 +255,22 @@ class MainActivity : Activity() {
 
     private fun showPsiphonSettings() {
         val prefs = getSharedPreferences("azadlink_psiphon_settings", MODE_PRIVATE)
+        val english = getSharedPreferences("azadlink_ui", MODE_PRIVATE).getString("language", "fa") == "en"
+        val light = getSharedPreferences("azadlink_ui", MODE_PRIVATE).getString("theme", "dark") == "light"
+        fun tr(fa: String, en: String) = if (english) en else fa
+        val fg = if (light) Color.rgb(26, 33, 51) else Color.WHITE
+        val muted = if (light) Color.rgb(85, 98, 121) else Color.rgb(159, 171, 197)
         val countries = listOf(
-            "سریع‌ترین / خودکار" to "",
-            "آمریکا" to "US",
-            "کانادا" to "CA",
-            "بریتانیا" to "GB",
-            "آلمان" to "DE",
-            "هلند" to "NL",
-            "فرانسه" to "FR",
-            "ژاپن" to "JP",
-            "سنگاپور" to "SG",
-            "هند" to "IN"
+            tr("سریع‌ترین / خودکار", "Fastest / automatic") to "",
+            tr("آمریکا", "United States") to "US",
+            tr("کانادا", "Canada") to "CA",
+            tr("بریتانیا", "United Kingdom") to "GB",
+            tr("آلمان", "Germany") to "DE",
+            tr("هلند", "Netherlands") to "NL",
+            tr("فرانسه", "France") to "FR",
+            tr("ژاپن", "Japan") to "JP",
+            tr("سنگاپور", "Singapore") to "SG",
+            tr("هند", "India") to "IN"
         )
         val saved = prefs.getString("country", "") ?: ""
         val selected = countries.indexOfFirst { it.second == saved }.coerceAtLeast(0)
@@ -280,22 +285,22 @@ class MainActivity : Activity() {
         val panel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(18), dp(10), dp(18), dp(8))
-            addView(text("موقعیت خروجی Psiphon", 15, Color.WHITE, true))
+            addView(text(tr("موقعیت خروجی Psiphon", "Psiphon exit location"), 15, fg, true))
             addView(space(7))
             addView(picker)
             addView(space(8))
             addView(text(
-                "سریع‌ترین / خودکار یعنی انتخاب کشور را به Psiphon می‌سپارد؛ کشور انتخابی تضمین‌کنندهٔ سرعت یا دسترس‌پذیری نیست.",
-                12, Color.rgb(159, 171, 197)
+                tr("سریع‌ترین / خودکار یعنی انتخاب کشور را به Psiphon می‌سپارد؛ کشور انتخابی تضمین‌کنندهٔ سرعت یا دسترس‌پذیری نیست.", "Fastest / automatic lets Psiphon choose a location. A selected country does not guarantee speed or availability."),
+                12, muted
             ))
         }
         AlertDialog.Builder(this)
-            .setTitle("موقعیت Psiphon")
+            .setTitle(tr("موقعیت Psiphon", "Psiphon location"))
             .setView(panel)
-            .setNegativeButton("لغو", null)
-            .setPositiveButton("ذخیره") { _, _ ->
+            .setNegativeButton(tr("لغو", "Cancel"), null)
+            .setPositiveButton(tr("ذخیره", "Save")) { _, _ ->
                 prefs.edit().putString("country", countries[picker.selectedItemPosition].second).apply()
-                Toast.makeText(this, "موقعیت Psiphon ذخیره شد.", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, tr("موقعیت Psiphon ذخیره شد.", "Psiphon location saved."), Toast.LENGTH_SHORT).show()
             }
             .show()
     }
