@@ -73,7 +73,7 @@ class MainActivity : Activity() {
                 }
                 val detail = snapshot.message?.takeIf { it.isNotBlank() }?.let { " · $it" } ?: ""
                 val gateway = snapshot.gateway?.let { " · $it" } ?: ""
-                topStatus.text = "وضعیت واقعی: $state$gateway$detail"
+                topStatus.text = localizeUi("وضعیت واقعی: $state$gateway$detail")
                 when (snapshot.stage) {
                     TunnelStage.CONNECTED -> setConnectionTimerActive(true)
                     TunnelStage.DISCONNECTED, TunnelStage.FAILED -> setConnectionTimerActive(false)
@@ -85,7 +85,7 @@ class MainActivity : Activity() {
     private val statusReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             val message = intent?.getStringExtra(AzadLinkVpnService.EXTRA_MESSAGE) ?: return
-            topStatus.text = "وضعیت: $message"
+            topStatus.text = localizeUi("وضعیت: $message")
             when {
                 message.contains("متصل ·", true) || message.contains("Psiphon متصل شد", true) || message.contains("تونل MASQUE برقرار شد", true) -> setConnectionTimerActive(true)
                 message.contains("اتصال قطع شد", true) || message.contains("خطای اتصال:", true) || message.contains("اتصال تونل تأیید نشد", true) -> setConnectionTimerActive(false)
@@ -1179,8 +1179,56 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun localizeUi(value: String): String {
+        val english = getSharedPreferences("azadlink_ui", MODE_PRIVATE).getString("language", "fa") == "en"
+        if (!english) return value
+        val exact = mapOf(
+            "بستن" to "Close", "لغو" to "Cancel", "ذخیره" to "Save", "حذف" to "Delete",
+            "اتصال" to "Connect", "قطع اتصال" to "Disconnect", "وضعیت اتصال" to "Connection status",
+            "آمادهٔ اتصال" to "Ready to connect", "پروتکل انتخاب‌شده" to "Selected protocol",
+            "هنوز پروفایلی اضافه نشده" to "No profiles added yet", "گزارش اتصال" to "Connection logs",
+            "گزارش کپی شد." to "Logs copied.", "موقعیت خروجی Psiphon" to "Psiphon exit location",
+            "تنظیمات پیشرفتهٔ MASQUE" to "Advanced MASQUE settings",
+            "اتصال زنجیره‌ای" to "Chain connection", "انتخاب پروتکل" to "Choose protocol"
+        )
+        exact[value]?.let { return it }
+        return when {
+            value.startsWith("وضعیت: ") -> "Status: " + translateStatus(value.removePrefix("وضعیت: "))
+            value.startsWith("وضعیت واقعی: ") -> "Live status: " + translateStatus(value.removePrefix("وضعیت واقعی: "))
+            value.startsWith("موتور: ") -> "Engine: " + value.removePrefix("موتور: ")
+            value.startsWith("مدت اتصال") -> value.replace("مدت اتصال", "Connected")
+            value.startsWith("نویسنده: ") -> "Author: " + value.removePrefix("نویسنده: ")
+            value == "در حال اتصال" -> "Connecting"
+            value == "در حال بررسی تونل" -> "Validating tunnel"
+            value == "متصل" -> "Connected"
+            value == "در حال قطع" -> "Disconnecting"
+            value == "قطع" -> "Disconnected"
+            value.startsWith("اتصال ناموفق") -> "Connection failed"
+            else -> value
+        }
+    }
+
+    private fun translateStatus(value: String): String {
+        val replacements = listOf(
+            "در حال آماده‌سازی موتور Aether" to "Preparing Aether engine",
+            "در حال راه‌اندازی زنجیرهٔ MASQUE → Psiphon" to "Starting MASQUE → Psiphon chain",
+            "در حال راه‌اندازی Psiphon" to "Starting Psiphon",
+            "هویت آماده است" to "Identity ready",
+            "تونل MASQUE برقرار شد" to "MASQUE tunnel established",
+            "تونل MASQUE در تلاش جایگزین برقرار شد" to "MASQUE tunnel established on fallback",
+            "اتصال قطع شد" to "Disconnected",
+            "در حال اتصال" to "Connecting",
+            "متصل" to "Connected",
+            "ناموفق" to "Failed",
+            "قطع" to "Disconnected"
+        )
+        var result = value
+        replacements.forEach { (fa, en) -> result = result.replace(fa, en) }
+        return result
+    }
+
     private fun button(title: String, action: () -> Unit): Button = Button(this).apply {
-        text = title
+        text = localizeUi(title)
         isAllCaps = false
         textSize = 14f
         setTextColor(Color.WHITE)
@@ -1191,7 +1239,7 @@ class MainActivity : Activity() {
         backgroundTintList = null
         setOnClickListener { action() }
     }
-    private fun text(value:String,size:Int,color:Int,bold:Boolean=false):TextView=TextView(this).apply { text=value; textSize=size.toFloat(); setTextColor(color); if(bold) setTypeface(typeface,Typeface.BOLD); setPadding(0,dp(3),0,dp(3)) }
+    private fun text(value:String,size:Int,color:Int,bold:Boolean=false):TextView=TextView(this).apply { text=localizeUi(value); textSize=size.toFloat(); setTextColor(color); if(bold) setTypeface(typeface,Typeface.BOLD); setPadding(0,dp(3),0,dp(3)) }
     private fun space(heightDp:Int):View=View(this).apply { layoutParams=LinearLayout.LayoutParams(1,dp(heightDp)) }
     private fun dp(value:Int):Int=(value*resources.displayMetrics.density).toInt()
     companion object { private const val REQUEST_VPN_PERMISSION=7102; private const val REQUEST_IMPORT_PSIPHON=7103 }
