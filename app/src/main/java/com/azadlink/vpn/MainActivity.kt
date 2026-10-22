@@ -28,6 +28,7 @@ import com.azadlink.vpn.runtime.ExternalEngineProfiles
 import com.azadlink.vpn.runtime.PsiphonAutoConnector
 import com.azadlink.vpn.runtime.PsiphonTunnelRuntime
 import com.azadlink.vpn.service.AzadLinkVpnService
+import com.azadlink.vpn.service.ExternalDnsVpnService
 import com.azadlink.vpn.core.EngineRegistry
 import com.azadlink.vpn.core.Protocol
 import com.azadlink.vpn.core.ProtocolParser
