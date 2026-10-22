@@ -247,7 +247,7 @@ jobs:
           prerelease: false
           name: AzadLink v0.10.0 · Stable
           body: |
-            AzadLink ${{ github.ref_name }} stable release.
+            AzadLink ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'v0.10.0' }} stable release.
 
             Includes the redesigned side drawer, protocol configuration management, app-routing and proxy settings, localized interface options, refined notification icon, and Aether MASQUE HTTP/2 defaults.
 
