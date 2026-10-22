@@ -166,8 +166,11 @@ class MainActivity : Activity() {
     }
     private fun refreshState() {
         val prefs = getSharedPreferences(AzadLinkVpnService.PREFS, MODE_PRIVATE)
-        topStatus.text = "وضعیت: " + (prefs.getString(AzadLinkVpnService.KEY_MESSAGE, "آمادهٔ اتصال") ?: "آمادهٔ اتصال")
+        val english = getSharedPreferences("azadlink_ui", MODE_PRIVATE).getString("language", "fa") == "en"
+        val saved = prefs.getString(AzadLinkVpnService.KEY_MESSAGE, if (english) "Ready to connect" else "آمادهٔ اتصال") ?: if (english) "Ready to connect" else "آمادهٔ اتصال"
+        topStatus.text = if (english && saved == "آمادهٔ اتصال") "Ready to connect" else (if (english) saved.replace("وضعیت:", "Status:").replace("در حال اتصال", "Connecting").replace("متصل", "Connected").replace("قطع اتصال", "Disconnecting").replace("اتصال قطع شد", "Disconnected") else "وضعیت: " + saved)
     }
+
     private fun requestConnect(profile: ProtocolProfile) {
         if (profile.protocol == Protocol.PSIPHON) {
             requestPsiphonAutoConnect()
@@ -777,106 +780,90 @@ class MainActivity : Activity() {
 
     private fun showProxySettings() {
         val prefs = getSharedPreferences("azadlink_routing", MODE_PRIVATE)
-        val panel = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(18), dp(10), dp(18), dp(8))
-        }
+        val english = getSharedPreferences("azadlink_ui", MODE_PRIVATE).getString("language", "fa") == "en"
+        val light = getSharedPreferences("azadlink_ui", MODE_PRIVATE).getString("theme", "dark") == "light"
+        fun tr(fa: String, en: String) = if (english) en else fa
+        val fg = if (light) Color.rgb(26, 33, 51) else Color.WHITE
+        val muted = if (light) Color.rgb(85, 98, 121) else Color.rgb(177, 188, 207)
+        val panel = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(18), dp(10), dp(18), dp(8)) }
         val enabled = android.widget.Switch(this).apply {
-            text = "فقط حالت پراکسی (بدون VPN سراسری)"
-            textSize = 14f
-            setTextColor(Color.WHITE)
-            isChecked = prefs.getBoolean("proxy_only", false)
+            text = tr("فقط حالت پراکسی (بدون VPN سراسری)", "Proxy-only mode (no system-wide VPN)")
+            textSize = 14f; setTextColor(fg); isChecked = prefs.getBoolean("proxy_only", false)
         }
-        panel.addView(enabled)
-        panel.addView(space(8))
-        panel.addView(text("در این حالت موتور به‌جای مسیریابی کل گوشی، پراکسی محلی را فراهم می‌کند. برای Xray پورت SOCKS برابر 127.0.0.1:10808 است؛ Aether از پورت خودش استفاده می‌کند. پشتیبانی از این حالت به موتور انتخابی بستگی دارد و برای موتورهای DNS هنوز یکسان نیست.", 12, Color.rgb(177, 188, 207)))
-        AlertDialog.Builder(this)
-            .setTitle("حالت پراکسی")
-            .setView(panel)
-            .setNegativeButton("لغو", null)
-            .setPositiveButton("ذخیره") { _, _ ->
+        panel.addView(enabled); panel.addView(space(8))
+        panel.addView(text(tr("در این حالت برنامه پراکسی محلی را فراهم می‌کند، اما همهٔ موتور‌ها از این حالت پشتیبانی نمی‌کنند. Xray معمولاً از SOCKS محلی و Aether از پورت داخلی خودش استفاده می‌کند؛ تونل‌های DNS ممکن است محدودیت داشته باشند.",
+            "In this mode the engine exposes a local proxy instead of routing the whole device. Support varies: Xray typically exposes local SOCKS and Aether uses its own local port; DNS tunnel engines may have limitations."), 12, muted))
+        AlertDialog.Builder(this).setTitle(tr("حالت پروکسی", "Proxy mode")).setView(panel)
+            .setNegativeButton(tr("لغو", "Cancel"), null)
+            .setPositiveButton(tr("ذخیره", "Save")) { _, _ ->
                 prefs.edit().putBoolean("proxy_only", enabled.isChecked).apply()
-                Toast.makeText(this, "حالت پراکسی ذخیره شد؛ اتصال فعلی را قطع و دوباره برقرار کن.", Toast.LENGTH_LONG).show()
-            }
-            .show()
+                Toast.makeText(this, tr("تنظیمات ذخیره شد؛ اتصال را دوباره برقرار کن.", "Saved. Reconnect for the change to take effect."), Toast.LENGTH_LONG).show()
+            }.show()
     }
 
     private fun showRoutingSettings() {
         val prefs = getSharedPreferences("azadlink_routing", MODE_PRIVATE)
+        val english = getSharedPreferences("azadlink_ui", MODE_PRIVATE).getString("language", "fa") == "en"
+        val light = getSharedPreferences("azadlink_ui", MODE_PRIVATE).getString("theme", "dark") == "light"
+        fun tr(fa: String, en: String) = if (english) en else fa
+        val fg = if (light) Color.rgb(26, 33, 51) else Color.WHITE
+        val muted = if (light) Color.rgb(85, 98, 121) else Color.rgb(177, 188, 207)
         val currentMode = prefs.getString("split_mode", "disabled") ?: "disabled"
         val selected = prefs.getStringSet("selected_apps", emptySet())?.toMutableSet() ?: mutableSetOf()
-        val panel = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(18), dp(8), dp(18), dp(8))
-        }
-        panel.addView(text("انتخاب کن کدام برنامه‌ها از تونل عبور کنند.", 14, Color.WHITE, true))
+        val panel = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(18), dp(8), dp(18), dp(8)) }
+        panel.addView(text(tr("انتخاب کن کدام برنامه‌ها از تونل عبور کنند.", "Choose which apps should use the tunnel."), 14, fg, true))
         panel.addView(space(8))
         val modeGroup = android.widget.RadioGroup(this).apply { orientation = android.widget.RadioGroup.VERTICAL }
-        val modeOptions = listOf(
-            "disabled" to "همهٔ برنامه‌ها از تونل عبور کنند",
-            "bypassSelected" to "همه به‌جز برنامه‌های انتخاب‌شده",
-            "onlySelected" to "فقط برنامه‌های انتخاب‌شده"
+        val options = listOf(
+            "disabled" to tr("همهٔ برنامه‌ها از تونل عبور کنند", "Route all apps through the tunnel"),
+            "bypassSelected" to tr("همه به‌جز برنامه‌های انتخاب‌شده", "All apps except selected ones"),
+            "onlySelected" to tr("فقط برنامه‌های انتخاب‌شده", "Only selected apps")
         )
-        val radios = modeOptions.map { (value, label) ->
+        val radios = options.map { (value, label) ->
             android.widget.RadioButton(this).apply {
-                text = label
-                tag = value
-                textSize = 13f
-                setTextColor(Color.WHITE)
-                isChecked = currentMode == value
-                modeGroup.addView(this)
+                text = label; tag = value; textSize = 13f; setTextColor(fg)
+                buttonTintList = android.content.res.ColorStateList.valueOf(Color.rgb(132, 103, 255))
+                isChecked = currentMode == value; modeGroup.addView(this)
             }
         }
-        panel.addView(modeGroup)
-        panel.addView(space(8))
-        panel.addView(text("برنامه‌ها", 15, Color.rgb(207, 199, 255), true))
-        panel.addView(space(5))
-
+        panel.addView(modeGroup); panel.addView(space(8))
+        panel.addView(text(tr("برنامه‌های نصب‌شده", "Installed apps"), 15, fg, true)); panel.addView(space(5))
         val launcherIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
-        val apps = packageManager.queryIntentActivities(launcherIntent, 0)
-            .mapNotNull { info ->
-                val appInfo = info.activityInfo?.applicationInfo ?: return@mapNotNull null
-                if (appInfo.packageName == packageName) return@mapNotNull null
-                val label = runCatching { packageManager.getApplicationLabel(appInfo).toString() }
-                    .getOrDefault(appInfo.packageName)
-                Triple(label, appInfo.packageName, info.loadIcon(packageManager))
-            }
-            .distinctBy { it.second }
-            .sortedBy { it.first.lowercase() }
+        val apps = packageManager.queryIntentActivities(launcherIntent, 0).mapNotNull { info ->
+            val appInfo = info.activityInfo?.applicationInfo ?: return@mapNotNull null
+            if (appInfo.packageName == packageName) return@mapNotNull null
+            val label = runCatching { packageManager.getApplicationLabel(appInfo).toString() }.getOrDefault(appInfo.packageName)
+            Triple(label, appInfo.packageName, info.loadIcon(packageManager))
+        }.distinctBy { it.second }.sortedBy { it.first.lowercase() }
         val appChecks = mutableMapOf<String, android.widget.CheckBox>()
         val appList = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         apps.forEach { (label, pkg, icon) ->
             val check = android.widget.CheckBox(this).apply {
-                text = "$label  ·  $pkg"
-                textSize = 12f
-                setTextColor(Color.WHITE)
-                isChecked = selected.contains(pkg)
+                text = "$label · $pkg"; textSize = 12f; setTextColor(fg); isChecked = selected.contains(pkg)
                 buttonTintList = android.content.res.ColorStateList.valueOf(Color.rgb(132, 103, 255))
-                setCompoundDrawablesWithIntrinsicBounds(icon, null, null, null)
-                compoundDrawablePadding = dp(8)
+                setCompoundDrawablesWithIntrinsicBounds(icon, null, null, null); compoundDrawablePadding = dp(8)
             }
-            appChecks[pkg] = check
-            appList.addView(check)
+            appChecks[pkg] = check; appList.addView(check)
         }
-        val appScroll = ScrollView(this).apply {
-            addView(appList)
-            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(240))
-        }
-        panel.addView(appScroll)
-        AlertDialog.Builder(this)
-            .setTitle("مسیریابی و حالت پراکسی")
-            .setView(ScrollView(this).apply { addView(panel) })
-            .setNegativeButton("لغو", null)
-            .setPositiveButton("ذخیره") { _, _ ->
+        val bulk = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER }
+        bulk.addView(button(tr("انتخاب همه", "Select all")) { appChecks.values.forEach { it.isChecked = true } },
+            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = dp(5) })
+        bulk.addView(button(tr("پاک‌کردن انتخاب‌ها", "Clear selection")) { appChecks.values.forEach { it.isChecked = false } },
+            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginStart = dp(5) })
+        panel.addView(bulk); panel.addView(space(6))
+        panel.addView(ScrollView(this).apply { addView(appList); layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(270)) })
+        AlertDialog.Builder(this).setTitle(tr("مسیریابی برنامه‌ها", "App routing")).setView(ScrollView(this).apply { addView(panel) })
+            .setNegativeButton(tr("لغو", "Cancel"), null)
+            .setPositiveButton(tr("ذخیره", "Save")) { _, _ ->
                 val mode = radios.firstOrNull { it.isChecked }?.tag as? String ?: "disabled"
-                val chosen = appChecks.filterValues { it.isChecked }.keys
-                prefs.edit()
-                    .putString("split_mode", mode)
-                    .putStringSet("selected_apps", chosen.toSet())
-                    .apply()
-                Toast.makeText(this, "تنظیمات ذخیره شد؛ اتصال را قطع و دوباره برقرار کن.", Toast.LENGTH_LONG).show()
-            }
-            .show()
+                val chosen = appChecks.filterValues { it.isChecked }.keys.toSet()
+                if (mode == "onlySelected" && chosen.isEmpty()) {
+                    Toast.makeText(this, tr("برای این حالت حداقل یک برنامه انتخاب کن.", "Select at least one app for this mode."), Toast.LENGTH_LONG).show()
+                    return@setPositiveButton
+                }
+                prefs.edit().putString("split_mode", mode).putStringSet("selected_apps", chosen).apply()
+                Toast.makeText(this, tr("ذخیره شد؛ اتصال را قطع و دوباره برقرار کن.", "Saved. Reconnect for the change to take effect."), Toast.LENGTH_LONG).show()
+            }.show()
     }
 
     private fun showMasqueAdvancedSettings() {
@@ -1020,64 +1007,57 @@ class MainActivity : Activity() {
     }
 
     private fun showProtocolDetail(protocol: Protocol) {
+        val prefs = getSharedPreferences("azadlink_ui", MODE_PRIVATE)
+        val english = prefs.getString("language", "fa") == "en"
+        val light = prefs.getString("theme", "dark") == "light"
+        fun tr(fa: String, en: String) = if (english) en else fa
+        val fg = if (light) Color.rgb(25, 32, 49) else Color.WHITE
+        val muted = if (light) Color.rgb(85, 98, 121) else Color.rgb(172, 182, 205)
         val engine = EngineRegistry.forProtocol(protocol)
-        val panel = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(20), dp(12), dp(20), dp(8))
-        }
-        panel.addView(text(protocol.displayName, 22, Color.WHITE, true))
+        val panel = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(12), dp(20), dp(8)) }
+        panel.addView(text(protocol.displayName, 22, fg, true))
         panel.addView(space(6))
-        panel.addView(text(protocol.note, 13, Color.rgb(172, 182, 205)))
+        panel.addView(text(protocol.note, 13, muted))
         panel.addView(space(14))
-        panel.addView(text("موتور", 12, Color.rgb(172, 182, 205), true))
-        panel.addView(text(engine.name, 15, Color.WHITE, true))
+        panel.addView(text(tr("موتور", "Engine"), 12, muted, true))
+        panel.addView(text(engine.name, 15, fg, true))
         panel.addView(space(5))
-        panel.addView(text(engine.detail, 12, Color.rgb(172, 182, 205)))
+        panel.addView(text(engine.detail, 12, muted))
         panel.addView(space(16))
-
         when (protocol) {
             Protocol.MASQUE -> {
-                panel.addView(button("اتصال خودکار") { requestAutoConnect() }.apply {
-                    background = rounded(Color.rgb(132, 103, 255), 14)
-                })
+                panel.addView(button(tr("اتصال خودکار", "Connect automatically")) { requestAutoConnect() })
                 panel.addView(space(7))
-                panel.addView(button("تنظیمات پیشرفتهٔ MASQUE") { showMasqueAdvancedSettings() }.apply {
-                    background = rounded(Color.rgb(37, 48, 70), 14)
-                })
+                panel.addView(button(tr("تنظیمات پیشرفتهٔ MASQUE", "Advanced MASQUE settings")) { showMasqueAdvancedSettings() })
                 panel.addView(space(7))
-                panel.addView(button("قطع اتصال") { disconnectVpn() })
+                panel.addView(button(tr("قطع اتصال", "Disconnect")) { disconnectVpn() })
             }
             Protocol.PSIPHON -> {
-                panel.addView(text("اتصال مستقیم با موتور Psiphon بسته‌بندی‌شده؛ بدون فایل JSON یا کانفیگ دستی. نتیجه فقط پس از گزارش وضعیت تونل مشخص می‌شود.", 12, Color.rgb(215, 208, 245)))
+                panel.addView(text(tr("اتصال مستقیم با موتور Psiphon همراه برنامه؛ وضعیت واقعی بعد از آماده‌شدن تونل گزارش می‌شود.",
+                    "Direct connection using the bundled Psiphon engine. The real tunnel status is reported after startup."), 12, muted))
                 panel.addView(space(9))
-                panel.addView(button("اتصال مستقیم Psiphon") { requestPsiphonAutoConnect() }.apply {
-                    background = rounded(Color.rgb(132, 103, 255), 14)
-                })
+                panel.addView(button(tr("اتصال مستقیم Psiphon", "Connect Psiphon")) { requestPsiphonAutoConnect() })
+                panel.addView(space(7))
+                panel.addView(button(tr("موقعیت خروجی", "Exit location")) { showPsiphonSettings() })
             }
             else -> {
                 val matching = profiles.filter { it.protocol == protocol }
                 if (matching.isEmpty()) {
-                    panel.addView(text("برای این پروتکل پروفایل سرور اضافه نشده.", 13, Color.rgb(255, 198, 111)))
+                    panel.addView(text(tr("برای این پروتکل هنوز پروفایلی ذخیره نشده.", "No saved profile exists for this protocol yet."), 13, if (light) Color.rgb(170, 99, 18) else Color.rgb(255, 198, 111)))
                     panel.addView(space(8))
-                    panel.addView(button("بستن و افزودن پروفایل") {
-                        profileInput.requestFocus()
-                        Toast.makeText(this, "پروفایل را در بخش افزودن پروفایل وارد کن.", Toast.LENGTH_LONG).show()
-                    })
+                    panel.addView(button(tr("افزودن کانفیگ این پروتکل", "Add this protocol's configuration")) { showServerProfilesDialog(protocol) })
                 } else {
                     matching.forEach { profile ->
-                        panel.addView(text(profile.label, 14, Color.WHITE, true))
+                        panel.addView(text(profile.label, 14, fg, true))
                         panel.addView(space(5))
-                        panel.addView(button("اتصال با این پروفایل") { requestConnect(profile) })
+                        panel.addView(button(tr("اتصال با این پروفایل", "Connect with this profile")) { requestConnect(profile) })
                         panel.addView(space(7))
                     }
+                    panel.addView(button(tr("افزودن پروفایل دیگر", "Add another profile")) { showServerProfilesDialog(protocol) })
                 }
             }
         }
-
-        AlertDialog.Builder(this)
-            .setView(panel)
-            .setNegativeButton("بستن", null)
-            .show()
+        AlertDialog.Builder(this).setView(panel).setNegativeButton(tr("بستن", "Close"), null).show()
     }
 
     private fun rounded(color: Int, radius: Int): GradientDrawable = GradientDrawable().apply {
