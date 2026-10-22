@@ -14,6 +14,7 @@ import go.Seq
 import libv2ray.CoreCallbackHandler
 import libv2ray.CoreController
 import libv2ray.Libv2ray
+import com.azadlink.vpn.R
 import com.azadlink.vpn.core.Protocol
 import com.azadlink.vpn.runtime.CoreConfigBuilder
 import com.azadlink.vpn.core.ProtocolProfile
@@ -213,7 +214,7 @@ class AzadLinkVpnService : VpnService(), CoreCallbackHandler {
             Notification.Builder(this)
         }
         return builder
-            .setSmallIcon(android.R.drawable.stat_sys_warning)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("AzadLink · $currentLabel")
             .setContentText(message)
             .setOngoing(true)
