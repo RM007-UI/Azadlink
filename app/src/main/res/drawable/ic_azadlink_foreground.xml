@@ -3,12 +3,17 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+    <!-- AzadLink: a compact A mark with a forward-flow cyan ribbon. -->
     <path
-        android:fillColor="#8467FF"
-        android:pathData="M54,20 L78,76 L65,76 L54,51 L43,76 L30,76 Z" />
+        android:fillColor="#8B5CF6"
+        android:pathData="M54,16 C50,16 47,18.5 45,23 L24,72 C21,78 23,84 29,86 C33,87 36,85 38,81 L54,45 L70,81 C72,85 75,87 79,86 C85,84 87,78 84,72 L63,23 C61,18.5 58,16 54,16 Z" />
     <path
-        android:fillColor="#54E2C3"
-        android:pathData="M41,61 L67,61 L63,52 L45,52 Z" />
-    <path android:fillColor="#54E2C3" android:pathData="M30,78 a4,4 0,1 0,8 0 a4,4 0,1 0,-8 0" />
-    <path android:fillColor="#54E2C3" android:pathData="M70,78 a4,4 0,1 0,8 0 a4,4 0,1 0,-8 0" />
+        android:fillColor="#070A13"
+        android:pathData="M54,43 L63,64 L45,64 Z" />
+    <path
+        android:fillColor="#35D8F2"
+        android:pathData="M25,65 C34,70.5 43,73 54,73 C65,73 74,70.5 83,65 L88,76 C78,83 67,87 54,87 C41,87 30,83 20,76 Z" />
+    <path
+        android:fillColor="#DCD5FF"
+        android:pathData="M54,24 L58.5,34 L54,31.5 L49.5,34 Z" />
 </vector>
