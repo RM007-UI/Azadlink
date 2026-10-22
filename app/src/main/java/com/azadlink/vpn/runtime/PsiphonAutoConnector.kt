@@ -4,7 +4,6 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import org.bepass.oblivion.vpn.AetherVpnService
-import org.bepass.oblivion.vpn.PsiphonBinary
 import org.bepass.oblivion.vpn.TunnelBus
 import org.bepass.oblivion.vpn.TunnelConfig
 import org.bepass.oblivion.vpn.TunnelSnapshot
@@ -25,12 +24,6 @@ object PsiphonAutoConnector {
         val run = generation.incrementAndGet()
         try {
             val app = context.applicationContext
-            // Fail immediately with a useful diagnostic instead of letting the UI
-            // wait several minutes when the bundled Psiphon executable is absent
-            // or not executable on this Android installation.
-            check(PsiphonBinary.path(app) != null) {
-                "فایل اجرایی Psiphon در APK پیدا نشد یا اجازهٔ اجرا ندارد؛ ساخت APK را بررسی کن."
-            }
             val routingPrefs = app.getSharedPreferences("azadlink_routing", Context.MODE_PRIVATE)
             val countryCode = country.trim().uppercase().takeIf {
                 it.isEmpty() || it.matches(Regex("[A-Z]{2}"))
