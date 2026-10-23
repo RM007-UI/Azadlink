@@ -221,6 +221,23 @@ jobs:
           echo "AZADLINK_KEYSTORE_PATH=$keystore" >> "$GITHUB_ENV"
           export AZADLINK_KEYSTORE_PATH="$keystore"
           gradle -PaetherAbi=arm64-v8a assembleRelease
+      - name: Verify release APK ABI and required Aether binary
+        if: github.event_name != 'pull_request' && steps.signing.outputs.enabled == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk="app/build/outputs/apk/release/app-release.apk"
+          test -s "$apk"
+          entries="$(unzip -Z1 "$apk")"
+          grep -Fxq 'lib/arm64-v8a/libaether.so' <<< "$entries" || {
+            echo "::error::Release APK is missing lib/arm64-v8a/libaether.so"
+            exit 1
+          }
+          if grep -Eq '^lib/(armeabi-v7a|x86|x86_64)/' <<< "$entries"; then
+            echo "::error::Release APK contains an ABI unsupported by the bundled native engines"
+            exit 1
+          fi
+          echo "Release APK contains the Aether executable for arm64-v8a and no unsupported ABI libraries."
       - name: Upload signed APK as workflow artifact
         if: github.event_name != 'pull_request' && steps.signing.outputs.enabled == 'true'
         uses: actions/upload-artifact@v4
