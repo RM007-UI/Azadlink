@@ -178,7 +178,10 @@ class AzadLinkVpnService : VpnService(), CoreCallbackHandler {
                 connection.disconnect()
             }
             if (code !in 200..399) throw IllegalStateException("آزمون اینترنت پاسخ HTTP $code داد")
-            publishStatus(if (proxyOnly) "پراکسی محلی فعال و آزموده شد · SOCKS5 127.0.0.1:10808" else "متصل · عبور ترافیک از تونل تأیید شد")
+            publishStatus(if (proxyOnly)
+                "پراکسی محلی فعال و آزموده شد · SOCKS5 127.0.0.1:10808"
+            else
+                "موتور و خروجی پراکسی آزموده شدند؛ وضعیت VPN فعال است")
         } catch (error: Throwable) {
             stopTunnel("اتصال تونل تأیید نشد: ${error.message ?: "آزمون اینترنت ناموفق بود"}")
         }
