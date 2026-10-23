@@ -178,7 +178,7 @@ jobs:
           AZADLINK_STORE_PASSWORD: ${{ secrets.AZADLINK_STORE_PASSWORD }}
           AZADLINK_KEY_ALIAS: ${{ secrets.AZADLINK_KEY_ALIAS }}
           AZADLINK_KEY_PASSWORD: ${{ secrets.AZADLINK_KEY_PASSWORD }}
-          AZADLINK_STABLE_RELEASE_REQUEST: ${{ github.event.head_commit.message == 'Publish AzadLink v0.11.0 stable release' }}
+          AZADLINK_STABLE_RELEASE_REQUEST: ${{ github.event.head_commit.message == 'Publish AzadLink v0.11.1 stable release' }}
         run: |
           set -euo pipefail
           present=0
@@ -237,19 +237,19 @@ jobs:
             (
               github.ref == 'refs/heads/feature/azadlink-v0.11-navigation' &&
               github.event_name == 'push' &&
-              github.event.head_commit.message == 'Publish AzadLink v0.11.0 stable release'
+              github.event.head_commit.message == 'Publish AzadLink v0.11.1 stable release'
             )
           )
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'v0.11.0' }}
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'v0.11.1' }}
           target_commitish: ${{ github.sha }}
           prerelease: false
-          name: AzadLink v0.11.0 · Stable
+          name: AzadLink v0.11.1 · Stable
           body: |
-            AzadLink ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'v0.11.0' }} stable release.
+            AzadLink ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'v0.11.1' }} stable release.
 
-            Includes the redesigned side drawer, protocol configuration management, app-routing and proxy settings, localized interface options, refined notification icon, and Aether MASQUE HTTP/2 defaults.
+            Includes the redesigned side drawer, protocol configuration management, app-routing and proxy settings, localized interface options, refined notification icon, and Aether MASQUE HTTP/2 defaults, faster first-connect gateway discovery, and automatic reuse of the last working gateway.
 
             GitHub Actions builds the signed APK and runs unit tests before attaching this release asset. Actual VPN reachability can still vary by network and should be checked on the target device.
           files: app/build/outputs/apk/release/app-release.apk
