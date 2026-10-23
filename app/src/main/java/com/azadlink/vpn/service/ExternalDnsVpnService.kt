@@ -117,7 +117,7 @@ class ExternalDnsVpnService : VpnService() {
             }
             status(
                 if (proxyOnly) "پراکسی محلی فعال شد · SOCKS5 127.0.0.1:" + spec.port
-                else "عبور ترافیک از تونل تأیید شد · " + protocol.displayName + " · رابط VPN فعال است"
+                else "موتور SOCKS5 آماده است؛ پل VPN فعال شد · " + protocol.displayName"
             )
             updateNotification(if (proxyOnly) "پراکسی محلی فعال است" else "تونل VPN فعال است")
         } catch (error: Throwable) {
