@@ -39,10 +39,10 @@ class ProtocolParserTest {
 
     @Test
     fun rejectsUnsupportedOrMalformedLinesWithoutLeakingRawSecrets() {
-        val result = ProtocolParser.parse("not-a-link\nvless://bad")
+        val result = ProtocolParser.parse("not-a-link\nftp://example.com")
 
         assertTrue(result.profiles.isEmpty())
         assertEquals(2, result.rejectedLines.size)
-        assertTrue(result.rejectedLines.none { it.contains("not-a-link") || it.contains("vless://bad") })
+        assertTrue(result.rejectedLines.none { it.contains("not-a-link") || it.contains("ftp://example.com") })
     }
 }
