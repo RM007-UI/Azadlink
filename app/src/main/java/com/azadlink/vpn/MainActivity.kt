@@ -640,17 +640,24 @@ private fun refreshState() {
         return runCatching { Protocol.valueOf(saved) }.getOrDefault(Protocol.MASQUE)
     }
 
-    private fun selectedProtocolName(): String = when (selectedProtocol()) {
-        Protocol.MASQUE -> "Aether · MASQUE"
-        Protocol.PSIPHON -> "Psiphon"
-        Protocol.VLESS -> "VLESS"
-        Protocol.VMESS -> "VMess"
-        Protocol.TROJAN -> "Trojan"
-        Protocol.SHADOWSOCKS -> "Shadowsocks"
-        Protocol.WIREGUARD -> "WireGuard"
-        Protocol.DNSTT -> "DNSTT"
-        Protocol.MASTER_DNS -> "Master DNS"
-        Protocol.STORM_DNS -> "Storm DNS"
+    private fun isChainSelected(): Boolean =
+        getSharedPreferences("azadlink_ui", MODE_PRIVATE)
+            .getString("selected_connection_mode", "single") == "chain"
+
+    private fun selectedProtocolName(): String {
+        if (isChainSelected()) return "MASQUE → Psiphon"
+        return when (selectedProtocol()) {
+            Protocol.MASQUE -> "Aether · MASQUE"
+            Protocol.PSIPHON -> "Psiphon"
+            Protocol.VLESS -> "VLESS"
+            Protocol.VMESS -> "VMess"
+            Protocol.TROJAN -> "Trojan"
+            Protocol.SHADOWSOCKS -> "Shadowsocks"
+            Protocol.WIREGUARD -> "WireGuard"
+            Protocol.DNSTT -> "DNSTT"
+            Protocol.MASTER_DNS -> "Master DNS"
+            Protocol.STORM_DNS -> "Storm DNS"
+        }
     }
 
     private fun onConnectionOrbTapped() {
@@ -662,6 +669,12 @@ private fun refreshState() {
     }
 
     private fun connectSelectedProtocol() {
+        // Selection only changes the mode. The chain starts only after the user
+        // taps the central connection orb.
+        if (isChainSelected()) {
+            requestPsiphonChainConnect()
+            return
+        }
         when (val protocol = selectedProtocol()) {
             Protocol.MASQUE -> requestAutoConnect()
             Protocol.PSIPHON -> requestPsiphonAutoConnect()
@@ -718,7 +731,10 @@ private fun refreshState() {
             body.addView(row); body.addView(space(5))
         }
         fun choose(protocol: Protocol, title: String) {
-            prefs.edit().putString("selected_protocol", protocol.name).apply()
+            prefs.edit()
+                .putString("selected_protocol", protocol.name)
+                .putString("selected_connection_mode", "single")
+                .apply()
             selectedProtocolLabel?.text = title
             selectedProtocolHint?.text = tr(
                 "انتخاب شد · برای اتصال روی دایره بزن",
@@ -732,22 +748,30 @@ private fun refreshState() {
             ).show()
         }
         heading("سرور و پراکسی", "Server protocols")
-        item("VLESS", "VLESS", "کانفیگ VLESS / Reality / TLS", "VLESS / Reality / TLS profiles", selectedProtocol() == Protocol.VLESS) { choose(Protocol.VLESS, "VLESS") }
-        item("VMess", "VMess", "کانفیگ VMess", "VMess profiles", selectedProtocol() == Protocol.VMESS) { choose(Protocol.VMESS, "VMess") }
-        item("Trojan", "Trojan", "اتصال مبتنی بر TLS", "TLS-based connection", selectedProtocol() == Protocol.TROJAN) { choose(Protocol.TROJAN, "Trojan") }
-        item("Shadowsocks", "Shadowsocks", "پروکسی رمزگذاری‌شده", "Encrypted proxy", selectedProtocol() == Protocol.SHADOWSOCKS) { choose(Protocol.SHADOWSOCKS, "Shadowsocks") }
-        item("WireGuard", "WireGuard", "تونل مبتنی بر کلید", "Key-based tunnel", selectedProtocol() == Protocol.WIREGUARD) { choose(Protocol.WIREGUARD, "WireGuard") }
-        item("اتصال زنجیره‌ای · MASQUE → Psiphon", "Chain connection · MASQUE → Psiphon", "اتصال زنجیره‌ای کنار پروتکل‌ها", "Chain connection beside other protocols") {
-            dialog.dismiss(); requestPsiphonChainConnect()
+        item("VLESS", "VLESS", "کانفیگ VLESS / Reality / TLS", "VLESS / Reality / TLS profiles", !isChainSelected() && selectedProtocol() == Protocol.VLESS) { choose(Protocol.VLESS, "VLESS") }
+        item("VMess", "VMess", "کانفیگ VMess", "VMess profiles", !isChainSelected() && selectedProtocol() == Protocol.VMESS) { choose(Protocol.VMESS, "VMess") }
+        item("Trojan", "Trojan", "اتصال مبتنی بر TLS", "TLS-based connection", !isChainSelected() && selectedProtocol() == Protocol.TROJAN) { choose(Protocol.TROJAN, "Trojan") }
+        item("Shadowsocks", "Shadowsocks", "پروکسی رمزگذاری‌شده", "Encrypted proxy", !isChainSelected() && selectedProtocol() == Protocol.SHADOWSOCKS) { choose(Protocol.SHADOWSOCKS, "Shadowsocks") }
+        item("WireGuard", "WireGuard", "تونل مبتنی بر کلید", "Key-based tunnel", !isChainSelected() && selectedProtocol() == Protocol.WIREGUARD) { choose(Protocol.WIREGUARD, "WireGuard") }
+        item("اتصال زنجیره‌ای · MASQUE → Psiphon", "Chain connection · MASQUE → Psiphon", "اول انتخاب کن؛ سپس دکمهٔ وسط را بزن", "Select first, then tap the center button", isChainSelected()) {
+            prefs.edit().putString("selected_connection_mode", "chain").apply()
+            selectedProtocolLabel?.text = tr("اتصال زنجیره‌ای · MASQUE → Psiphon", "Chain · MASQUE → Psiphon")
+            selectedProtocolHint?.text = tr("انتخاب شد · برای شروع روی دایره بزن", "Selected · tap the circle to start")
+            dialog.dismiss()
+            Toast.makeText(
+                this@MainActivity,
+                tr("اتصال زنجیره‌ای انتخاب شد؛ برای اتصال روی دایرهٔ وسط بزن.", "Chain selected. Tap the center circle to connect."),
+                Toast.LENGTH_SHORT
+            ).show()
         }
         heading("تونل‌های DNS", "DNS tunnels")
-        item("DNSTT", "DNSTT", "تونل DNS", "DNS tunnel", selectedProtocol() == Protocol.DNSTT) { choose(Protocol.DNSTT, "DNSTT") }
-        item("Master DNS", "Master DNS", "موتور MasterDNS", "MasterDNS engine", selectedProtocol() == Protocol.MASTER_DNS) { choose(Protocol.MASTER_DNS, "Master DNS") }
-        item("Storm DNS", "Storm DNS", "موتور StormDNS", "StormDNS engine", selectedProtocol() == Protocol.STORM_DNS) { choose(Protocol.STORM_DNS, "Storm DNS") }
+        item("DNSTT", "DNSTT", "تونل DNS", "DNS tunnel", !isChainSelected() && selectedProtocol() == Protocol.DNSTT) { choose(Protocol.DNSTT, "DNSTT") }
+        item("Master DNS", "Master DNS", "موتور MasterDNS", "MasterDNS engine", !isChainSelected() && selectedProtocol() == Protocol.MASTER_DNS) { choose(Protocol.MASTER_DNS, "Master DNS") }
+        item("Storm DNS", "Storm DNS", "موتور StormDNS", "StormDNS engine", !isChainSelected() && selectedProtocol() == Protocol.STORM_DNS) { choose(Protocol.STORM_DNS, "Storm DNS") }
         heading("Aether / MASQUE", "Aether / MASQUE")
-        item("Aether · MASQUE", "Aether · MASQUE", "اتصال خودکار و تنظیمات پیشرفته", "Automatic connection and advanced options", selectedProtocol() == Protocol.MASQUE) { choose(Protocol.MASQUE, "Aether · MASQUE") }
+        item("Aether · MASQUE", "Aether · MASQUE", "اتصال خودکار و تنظیمات پیشرفته", "Automatic connection and advanced options", !isChainSelected() && selectedProtocol() == Protocol.MASQUE) { choose(Protocol.MASQUE, "Aether · MASQUE") }
         heading("Psiphon", "Psiphon")
-        item("Psiphon", "Psiphon", "اتصال مستقیم با موتور همراه برنامه", "Direct connection using the bundled engine", selectedProtocol() == Protocol.PSIPHON) { choose(Protocol.PSIPHON, "Psiphon") }
+        item("Psiphon", "Psiphon", "اتصال مستقیم با موتور همراه برنامه", "Direct connection using the bundled engine", !isChainSelected() && selectedProtocol() == Protocol.PSIPHON) { choose(Protocol.PSIPHON, "Psiphon") }
         heading("مدیریت", "Manage")
         item("کانفیگ‌ها و سرورها", "Server configurations", "افزودن، اتصال و حذف پروفایل‌ها", "Add, connect and remove profiles") { dialog.dismiss(); showServerProfilesDialog() }
         item("حالت پروکسی", "Proxy mode", "تنظیم پراکسی محلی", "Configure local proxy mode") { dialog.dismiss(); showProxySettings() }
