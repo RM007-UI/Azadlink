@@ -2,20 +2,20 @@
 
 AzadLink is an experimental Android VPN client integrating Aether/MASQUE, Psiphon, Xray share-link protocols, and DNS tunnel engines.
 
-## Current version: 0.11.2
+## Current version: 0.11.3
 
 
 
 - Four bottom navigation sections: server protocols, DNS tunnels, Aether/MASQUE, and Psiphon.
 - MASQUE advanced options: HTTP/2 vs engine default, obfuscation profile, IP family, and TLS SNI.
-- Faster automatic MASQUE connection: use Turbo scan for the first verified gateway, then reuse the last known-working gateway on reconnect; fall back to Balanced scan if Turbo fails.
+- Better automatic MASQUE gateway selection: Balanced scan compares verified gateways on first connect; Aether's quick-reconnect path reuses its persisted last-working endpoint on later connects, with Turbo as the faster fallback scan. HTTP/2 remains the automatic default, with HTTP/3 fallback when needed.
 - This release packages only `arm64-v8a`, because the Aether executable and the bundled tunnel engines are built for 64-bit ARM. Older 32-bit-only Android systems are not supported by this build.
 - App-based split tunneling: route all apps, exclude selected apps, or route only selected apps.
 - Launcher icon and release-signing configuration.
 - Proxy-only mode is implemented for Aether/Psiphon and Xray-based server protocols; apps must be configured to use the local SOCKS endpoint. DNS tunnel engines still need separate VPN/proxy integration.
 - Psiphon is built from the pinned Aether-compatible fork in CI. Device-level startup and live traffic still need verification.
 
-A successful CI build does not prove that every protocol works on every network. Check the Actions workflow and test on-device before treating a build as stable.
+Regression tests cover share-link parsing, WireGuard block parsing, Xray configuration generation, and reconnect backoff. A successful CI build still does not prove that every protocol works on every network. Check the Actions workflow and test on-device before treating a build as stable.
 
 ## Stable APK signing
 
