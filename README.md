@@ -12,7 +12,7 @@ AzadLink is an experimental Android VPN client integrating Aether/MASQUE, Psipho
 - This release packages only `arm64-v8a`, because the Aether executable and the bundled tunnel engines are built for 64-bit ARM. Older 32-bit-only Android systems are not supported by this build.
 - App-based split tunneling: route all apps, exclude selected apps, or route only selected apps.
 - Launcher icon and release-signing configuration.
-- Proxy-only mode is implemented for Aether/Psiphon and Xray-based server protocols; apps must be configured to use the local SOCKS endpoint. DNS tunnel engines still need separate VPN/proxy integration.
+- Proxy-only mode is implemented for Aether/Psiphon and Xray-based server protocols; apps must be configured to use the local SOCKS endpoint. DNS tunnel engines use the built-in SOCKS5-to-TUN bridge and require valid server-side configuration.
 - Psiphon is built from the pinned Aether-compatible fork in CI. Device-level startup and live traffic still need verification.
 
 Regression tests cover share-link parsing, WireGuard block parsing, Xray configuration generation, and reconnect backoff. A successful CI build still does not prove that every protocol works on every network. Check the Actions workflow and test on-device before treating a build as stable.
