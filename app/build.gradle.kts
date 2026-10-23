@@ -19,7 +19,7 @@ android {
     namespace = "com.azadlink.vpn"
     compileSdk = 35
     defaultConfig {
-        // AzadLink v0.11.2 stable release
+        // AzadLink v0.11.3 stable release
         // Release gate: build and test before publishing the signed APK.
         applicationId = "com.azadlink.vpn"
         minSdk = 26
@@ -27,8 +27,8 @@ android {
         // Aether and bundled native tunnel engines are currently built for 64-bit ARM only.
         // Do not let 32-bit-only AAR libraries make Android launch a 32-bit process without libaether.so.
         ndk { abiFilters += listOf("arm64-v8a") }
-        versionCode = 17
-        versionName = "0.11.2"
+        versionCode = 18
+        versionName = "0.11.3"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     signingConfigs {
