@@ -82,8 +82,15 @@ class MainActivity : Activity() {
                 val detail = snapshot.message?.takeIf { it.isNotBlank() }?.let { " · $it" } ?: ""
                 val gateway = snapshot.gateway?.let { " · $it" } ?: ""
                 topStatus.text = localizeUi("وضعیت واقعی: $state$gateway$detail")
-                val showDisconnected = snapshot.stage == TunnelStage.DISCONNECTED &&
-                    connectionUiState in setOf(ConnectionUiState.CONNECTING, ConnectionUiState.CONNECTED, ConnectionUiState.DISCONNECTING)
+                val wasActive = connectionUiState in setOf(
+                    ConnectionUiState.CONNECTING, ConnectionUiState.CONNECTED, ConnectionUiState.DISCONNECTING
+                )
+                // Clear the saved timer only for a real live loss, never for the initial/stale
+                // DISCONNECTED state reported while the Activity is being recreated.
+                if (wasActive && snapshot.stage in setOf(TunnelStage.DISCONNECTED, TunnelStage.FAILED)) {
+                    setConnectionTimerActive(false)
+                }
+                val showDisconnected = snapshot.stage == TunnelStage.DISCONNECTED && wasActive
                 setConnectionUiState(
                     when (snapshot.stage) {
                         TunnelStage.DISCONNECTED -> ConnectionUiState.DISCONNECTED
@@ -479,6 +486,8 @@ private fun refreshState() {
     private fun disconnectVpn() {
         setConnectionUiState(ConnectionUiState.DISCONNECTING)
         stopOtherTunnelEngines("none")
+        // An explicit user disconnect ends this timing session.
+        setConnectionTimerActive(false)
         setConnectionUiState(ConnectionUiState.DISCONNECTED)
         topStatus.text = "وضعیت: اتصال قطع شد"
     }
@@ -493,6 +502,9 @@ private fun refreshState() {
                 value.contains("ناموفق") || value.contains("تأیید نشد") ||
                 value.contains("برقرار نشد") || value.contains("آماده نشد") ||
                 value.contains("timeout") || value.contains("failed") -> {
+                if (liveEvent && connectionUiState in setOf(
+                        ConnectionUiState.CONNECTING, ConnectionUiState.CONNECTED, ConnectionUiState.DISCONNECTING
+                    )) setConnectionTimerActive(false)
                 setConnectionUiState(ConnectionUiState.FAILED)
             }
             value.contains("در حال اتصال") || value.contains("در حال راه‌اندازی") ||
@@ -513,6 +525,9 @@ private fun refreshState() {
             value.contains("اتصال قطع شد") || value == "قطع" ||
                 value.contains("disconnected") || value.contains("ready to connect") ||
                 value.contains("آمادهٔ اتصال") -> {
+                if (liveEvent && connectionUiState in setOf(
+                        ConnectionUiState.CONNECTING, ConnectionUiState.CONNECTED, ConnectionUiState.DISCONNECTING
+                    )) setConnectionTimerActive(false)
                 setConnectionUiState(
                     ConnectionUiState.DISCONNECTED,
                     showDisconnectedFeedback = liveEvent &&
@@ -527,11 +542,10 @@ private fun refreshState() {
         showDisconnectedFeedback: Boolean = false
     ) {
         connectionUiState = state
-        when (state) {
-            ConnectionUiState.CONNECTED -> setConnectionTimerActive(true)
-            ConnectionUiState.DISCONNECTED, ConnectionUiState.FAILED -> setConnectionTimerActive(false)
-            else -> Unit
-        }
+        // Entering a generic DISCONNECTED/FAILED UI state can happen on Activity startup
+        // before the tunnel's live status has been restored. Do not erase persisted timing
+        // here; clear it only on an explicit disconnect or a confirmed live loss event.
+        if (state == ConnectionUiState.CONNECTED) setConnectionTimerActive(true)
 
         connectionFeedbackRunnable?.let { connectionFeedbackHandler.removeCallbacks(it) }
         connectionFeedbackRunnable = null
