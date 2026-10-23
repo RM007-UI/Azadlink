@@ -77,18 +77,17 @@ object AetherAutoConnector {
                 onStatusOnMain(onStatus, "هویت آماده است؛ در حال راه‌اندازی تونل MASQUE…")
                 val masquePrefs = appContext.getSharedPreferences("azadlink_masque", Context.MODE_PRIVATE)
                 val routingPrefs = appContext.getSharedPreferences("azadlink_routing", Context.MODE_PRIVATE)
-                // New installs and Auto/Default presets prefer the known-good HTTP/2 path.
+                // Balanced ranks several verified gateways and chooses the fastest one.
+                // --quick-reconnect lets Aether reuse its persisted last-working endpoint on later connects.
+                // Keep HTTP/2 as the automatic carrier for networks where UDP/QUIC is filtered.
                 // Respect explicit advanced choices only when the user selected Manual mode.
                 val connectionMode = masquePrefs.getString("connection_mode", "auto") ?: "auto"
                 val automatic = connectionMode != "manual"
-                // Turbo accepts the first verified gateway instead of waiting to rank six candidates.
-                // Balanced remains the automatic fallback if the fast first attempt fails.
-                val scanMode = if (automatic) "turbo" else
+                val scanMode = if (automatic) "balanced" else
                     (masquePrefs.getString("scan_mode", "balanced") ?: "balanced")
                         .lowercase().let { if (it in setOf("turbo", "balanced", "thorough", "stealth", "ironclad")) it else "balanced" }
                 val firstScanMode = if (scanMode in setOf("thorough", "stealth", "ironclad")) "turbo" else scanMode
                 val fallbackScanMode = if (firstScanMode != scanMode) scanMode else when (scanMode) {
-                    "turbo" -> "balanced"
                     "balanced" -> "turbo"
                     else -> "balanced"
                 }
@@ -151,7 +150,7 @@ object AetherAutoConnector {
                         if (connectionGeneration.get() != generation || !attemptFinished.compareAndSet(0, 1)) return
                         mainHandler.removeCallbacks(watchdog)
                         TunnelBus.removeStatusListener(statusListener)
-                        if (!transportFallbackAttempt && autoFallback && attemptTransport == "h2") {
+                        if (autoFallback && attemptTransport == "h2" && !transportFallbackAttempt) {
                             onStatusOnMain(onStatus, "$reason؛ HTTP/2 ناموفق بود؛ در حال آزمون HTTP/3…")
                             AetherVpnService.stop(appContext)
                             mainHandler.postDelayed({
@@ -162,12 +161,13 @@ object AetherAutoConnector {
                         } else if (!fallbackAttempt && autoFallback) {
                             onStatusOnMain(
                                 onStatus,
-                                "$reason؛ در حال توقف تلاش فعلی و شروع اسکن جایگزین «$fallbackScanMode»…"
+                                "$reason؛ در حال شروع اسکن جایگزین «$fallbackScanMode» با HTTP/2…"
                             )
                             AetherVpnService.stop(appContext)
                             mainHandler.postDelayed({
                                 if (connectionGeneration.get() == generation) {
-                                    startAttempt(fallbackScanMode, true, attemptTransport, true)
+                                    // Restart the fallback scan on H2 first, then let it try H3 if needed.
+                                    startAttempt(fallbackScanMode, true, "h2", false)
                                 }
                             }, 2200L)
                         } else {
@@ -235,10 +235,10 @@ object AetherAutoConnector {
     }
 
     private fun attemptTimeoutMs(scanMode: String, fallbackAttempt: Boolean, automatic: Boolean): Long {
-        // Let the first automatic balanced scan fail fast, but don't interrupt a user's
-        // explicitly selected scan or the thorough fallback before Aether's own budget ends.
+        // Balanced compares multiple verified endpoints; allow its ranking window to finish.
+        // Turbo fallback remains the short path if the first scan cannot connect.
         if (automatic && !fallbackAttempt && scanMode.equals("balanced", ignoreCase = true)) {
-            return 155_000L
+            return 190_000L
         }
         return when (scanMode.trim().lowercase()) {
             "turbo", "fast" -> 115_000L
