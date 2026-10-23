@@ -268,7 +268,7 @@ jobs:
 
             Includes the redesigned side drawer, protocol configuration management, app-routing and proxy settings, localized interface options, refined notification icon, and Aether MASQUE HTTP/2 defaults, balanced gateway ranking for better endpoint selection, and reuse of Aether's persisted last-working endpoint.
 
-            GitHub Actions runs regression tests for protocol parsing, WireGuard profile parsing, Xray config generation, and reconnect backoff, then verifies the signed APK includes the arm64-v8a Aether binary. Actual VPN reachability and throughput still require testing on the target device.
+            GitHub Actions runs regression tests for protocol parsing, WireGuard profile parsing, Xray config generation, and reconnect backoff, then verifies the signed APK includes the arm64-v8a Aether binary. Connection status messages distinguish a started local proxy/TUN bridge from end-to-end traffic verification; actual VPN reachability and throughput still require testing on the target device.
           files: app/build/outputs/apk/release/app-release.apk
           generate_release_notes: true
       - name: Publish build summary
