@@ -52,6 +52,9 @@ class MainActivity : Activity() {
     private var pendingPsiphonAuto = false
     private var pendingPsiphonChain = false
     private var receiverRegistered = false
+    // Tracks whether this Activity has observed a real live Aether connection, so an
+    // initial stale DISCONNECTED snapshot cannot erase a timer restored from preferences.
+    private var observedLiveTunnelConnection = false
     private var selectedProtocolLabel: TextView? = null
     private var selectedProtocolHint: TextView? = null
     private var connectionTimerText: TextView? = null
@@ -82,13 +85,16 @@ class MainActivity : Activity() {
                 val detail = snapshot.message?.takeIf { it.isNotBlank() }?.let { " · $it" } ?: ""
                 val gateway = snapshot.gateway?.let { " · $it" } ?: ""
                 topStatus.text = localizeUi("وضعیت واقعی: $state$gateway$detail")
+                if (snapshot.stage == TunnelStage.CONNECTED) observedLiveTunnelConnection = true
                 val wasActive = connectionUiState in setOf(
                     ConnectionUiState.CONNECTING, ConnectionUiState.CONNECTED, ConnectionUiState.DISCONNECTING
                 )
-                // Clear the saved timer only for a real live loss, never for the initial/stale
-                // DISCONNECTED state reported while the Activity is being recreated.
-                if (wasActive && snapshot.stage in setOf(TunnelStage.DISCONNECTED, TunnelStage.FAILED)) {
+                // Only a connection observed live in this Activity session can be ended by
+                // this listener. Its initial/default DISCONNECTED snapshot is not authoritative.
+                if (observedLiveTunnelConnection && wasActive &&
+                    snapshot.stage in setOf(TunnelStage.DISCONNECTED, TunnelStage.FAILED)) {
                     setConnectionTimerActive(false)
+                    observedLiveTunnelConnection = false
                 }
                 val showDisconnected = snapshot.stage == TunnelStage.DISCONNECTED && wasActive
                 setConnectionUiState(
