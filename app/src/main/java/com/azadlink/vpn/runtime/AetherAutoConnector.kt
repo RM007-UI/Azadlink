@@ -81,7 +81,9 @@ object AetherAutoConnector {
                 // Respect explicit advanced choices only when the user selected Manual mode.
                 val connectionMode = masquePrefs.getString("connection_mode", "auto") ?: "auto"
                 val automatic = connectionMode != "manual"
-                val scanMode = if (automatic) "balanced" else
+                // Turbo accepts the first verified gateway instead of waiting to rank six candidates.
+                // Balanced remains the automatic fallback if the fast first attempt fails.
+                val scanMode = if (automatic) "turbo" else
                     (masquePrefs.getString("scan_mode", "balanced") ?: "balanced")
                         .lowercase().let { if (it in setOf("turbo", "balanced", "thorough", "stealth", "ironclad")) it else "balanced" }
                 val firstScanMode = if (scanMode in setOf("thorough", "stealth", "ironclad")) "turbo" else scanMode
@@ -109,6 +111,7 @@ object AetherAutoConnector {
                         "--ip", ipVersion,
                         "--validate-secs", "10",
                         "--reconnect-secs", "2",
+                        "--quick-reconnect",
                         "--noize", obfuscation,
                         "--masque",
                         "--masque-sni", masqueSni
