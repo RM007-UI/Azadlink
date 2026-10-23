@@ -177,10 +177,18 @@ class MainActivity : Activity() {
         else { setConnectionUiState(ConnectionUiState.DISCONNECTED); Toast.makeText(this, "اجازهٔ VPN داده نشد", Toast.LENGTH_LONG).show() }
     }
 
-    private var connectionTimerStartedAt: Long? = null
+    private val connectionTimerPrefs by lazy {
+        getSharedPreferences("azadlink_connection_state", MODE_PRIVATE)
+    }
+    private var connectionTimerStartedAt: Long?
+        get() = connectionTimerPrefs.getLong("connected_since_ms", 0L).takeIf { it > 0L }
+        set(value) {
+            connectionTimerPrefs.edit().putLong("connected_since_ms", value ?: 0L).apply()
+        }
 
     private fun setConnectionTimerActive(active: Boolean) {
         if (active) {
+            // Keep the original start timestamp across Activity recreation and app backgrounding.
             if (connectionTimerStartedAt == null) connectionTimerStartedAt = System.currentTimeMillis()
         } else {
             connectionTimerStartedAt = null
