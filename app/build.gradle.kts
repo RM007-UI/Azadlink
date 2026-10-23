@@ -20,6 +20,7 @@ android {
     compileSdk = 35
     defaultConfig {
         // AzadLink v0.11.2 stable release
+        // Release gate: build and test before publishing the signed APK.
         applicationId = "com.azadlink.vpn"
         minSdk = 26
         targetSdk = 35
