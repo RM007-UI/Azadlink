@@ -153,9 +153,18 @@ object AetherAutoConnector {
                     lateinit var watchdog: Runnable
 
                     fun finishFailure(reason: String) {
-                        if (connectionGeneration.get() != generation || !attemptFinished.compareAndSet(0, 1)) return
+                        if (!attemptFinished.compareAndSet(0, 1)) return
                         mainHandler.removeCallbacks(watchdog)
                         TunnelBus.removeStatusListener(statusListener)
+                        // An old timeout must never stop a newer session that has already started.
+                        val stoppedCurrentAttempt = synchronized(lifecycleLock) {
+                            if (connectionGeneration.get() != generation) false
+                            else {
+                                AetherVpnService.stop(appContext)
+                                true
+                            }
+                        }
+                        if (!stoppedCurrentAttempt) return
                         if (!fallbackAttempt && autoFallback) {
                             // A balanced scan samples only part of each subnet. If it finds no
                             // gateway, widen the address search before changing transport.
@@ -163,7 +172,6 @@ object AetherAutoConnector {
                                 onStatus,
                                 "$reason؛ در حال گسترش اسکن به «$fallbackScanMode» با HTTP/2…"
                             )
-                            AetherVpnService.stop(appContext)
                             mainHandler.postDelayed({
                                 if (connectionGeneration.get() == generation) {
                                     startAttempt(fallbackScanMode, true, "h2", false)
@@ -179,7 +187,6 @@ object AetherAutoConnector {
                                 }
                             }, 1800L)
                         } else {
-                            AetherVpnService.stop(appContext)
                             onStatusOnMain(
                                 onStatus,
                                 "$reason اتصال MASQUE برقرار نشد. حالت اسکن: $attemptScanMode؛ گزارش موتور را بررسی کن."
