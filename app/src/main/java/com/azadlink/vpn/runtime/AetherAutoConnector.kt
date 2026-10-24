@@ -26,10 +26,19 @@ object AetherAutoConnector {
     private val mainHandler = Handler(Looper.getMainLooper())
 
     private val connectionGeneration = AtomicInteger(0)
+    // Serialize generation changes with service starts/stops so a stale retry cannot
+    // resurrect an older Aether session after a newer attempt has begun.
+    private val lifecycleLock = Any()
 
     fun connect(context: Context, onStatus: (String) -> Unit) {
-        val generation = connectionGeneration.incrementAndGet()
         val appContext = context.applicationContext
+        val generation = synchronized(lifecycleLock) {
+            val next = connectionGeneration.incrementAndGet()
+            // The previous implementation invalidated old callbacks but left the old core
+            // alive. Stop it before preparing the replacement attempt.
+            AetherVpnService.stop(appContext)
+            next
+        }
         Thread({
             try {
                 onStatusOnMain(onStatus, "در حال بررسی موتور Aether…")
@@ -87,10 +96,7 @@ object AetherAutoConnector {
                     (masquePrefs.getString("scan_mode", "balanced") ?: "balanced")
                         .lowercase().let { if (it in setOf("turbo", "balanced", "thorough", "stealth", "ironclad")) it else "balanced" }
                 val firstScanMode = if (scanMode in setOf("thorough", "stealth", "ironclad")) "turbo" else scanMode
-                val fallbackScanMode = if (firstScanMode != scanMode) scanMode else when (scanMode) {
-                    "balanced" -> "turbo"
-                    else -> "balanced"
-                }
+                val fallbackScanMode = fallbackScanModeFor(scanMode, firstScanMode)
                 val ipVersion = if (automatic) "both" else (masquePrefs.getString("ip_version", "both") ?: "both")
                 val obfuscation = if (automatic) "firewall" else (masquePrefs.getString("obfuscation", "firewall") ?: "firewall")
                 val transport = if (automatic) "h2" else if ((masquePrefs.getString("transport", "h2") ?: "h2") == "h2") "h2" else "h3"
@@ -150,26 +156,28 @@ object AetherAutoConnector {
                         if (connectionGeneration.get() != generation || !attemptFinished.compareAndSet(0, 1)) return
                         mainHandler.removeCallbacks(watchdog)
                         TunnelBus.removeStatusListener(statusListener)
-                        if (autoFallback && attemptTransport == "h2" && !transportFallbackAttempt) {
-                            onStatusOnMain(onStatus, "$reason؛ HTTP/2 ناموفق بود؛ در حال آزمون HTTP/3…")
+                        if (!fallbackAttempt && autoFallback) {
+                            // A balanced scan samples only part of each subnet. If it finds no
+                            // gateway, widen the address search before changing transport.
+                            onStatusOnMain(
+                                onStatus,
+                                "$reason؛ در حال گسترش اسکن به «$fallbackScanMode» با HTTP/2…"
+                            )
+                            AetherVpnService.stop(appContext)
+                            mainHandler.postDelayed({
+                                if (connectionGeneration.get() == generation) {
+                                    startAttempt(fallbackScanMode, true, "h2", false)
+                                }
+                            }, 1800L)
+                        } else if (autoFallback && attemptTransport == "h2" && !transportFallbackAttempt) {
+                            // Only try HTTP/3 after the wider H2 scan failed; many networks filter QUIC.
+                            onStatusOnMain(onStatus, "$reason؛ اسکن جایگزین هم ناموفق بود؛ در حال آزمون HTTP/3…")
                             AetherVpnService.stop(appContext)
                             mainHandler.postDelayed({
                                 if (connectionGeneration.get() == generation) {
                                     startAttempt(attemptScanMode, fallbackAttempt, "h3", true)
                                 }
                             }, 1800L)
-                        } else if (!fallbackAttempt && autoFallback) {
-                            onStatusOnMain(
-                                onStatus,
-                                "$reason؛ در حال شروع اسکن جایگزین «$fallbackScanMode» با HTTP/2…"
-                            )
-                            AetherVpnService.stop(appContext)
-                            mainHandler.postDelayed({
-                                if (connectionGeneration.get() == generation) {
-                                    // Restart the fallback scan on H2 first, then let it try H3 if needed.
-                                    startAttempt(fallbackScanMode, true, "h2", false)
-                                }
-                            }, 2200L)
                         } else {
                             AetherVpnService.stop(appContext)
                             onStatusOnMain(
@@ -211,7 +219,14 @@ object AetherAutoConnector {
                     }
                     TunnelBus.addStatusListener(statusListener)
                     try {
-                        AetherVpnService.start(appContext, TunnelConfig.fromMap(settings, arguments))
+                        synchronized(lifecycleLock) {
+                            if (connectionGeneration.get() != generation) {
+                                mainHandler.removeCallbacks(watchdog)
+                                TunnelBus.removeStatusListener(statusListener)
+                                return
+                            }
+                            AetherVpnService.start(appContext, TunnelConfig.fromMap(settings, arguments))
+                        }
                         mainHandler.postDelayed(watchdog, attemptTimeoutMs(attemptScanMode, fallbackAttempt, automatic))
                     } catch (error: Throwable) {
                         if (attemptFinished.compareAndSet(0, 1)) {
@@ -230,8 +245,23 @@ object AetherAutoConnector {
     }
 
     fun disconnect(context: Context) {
-        connectionGeneration.incrementAndGet()
-        AetherVpnService.stop(context.applicationContext)
+        synchronized(lifecycleLock) {
+            connectionGeneration.incrementAndGet()
+            AetherVpnService.stop(context.applicationContext)
+        }
+    }
+
+    /**
+     * Balanced samples candidate addresses; thorough scans the full subnet.
+     * Use the broader scan as the automatic fallback when balanced finds no gateway.
+     */
+    internal fun fallbackScanModeFor(scanMode: String, firstScanMode: String): String {
+        if (firstScanMode != scanMode) return scanMode
+        return when (scanMode.trim().lowercase()) {
+            "balanced" -> "thorough"
+            "turbo", "fast" -> "balanced"
+            else -> "balanced"
+        }
     }
 
     private fun attemptTimeoutMs(scanMode: String, fallbackAttempt: Boolean, automatic: Boolean): Long {
