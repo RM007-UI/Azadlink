@@ -17,6 +17,12 @@ AzadLink is an experimental Android VPN client integrating Aether/MASQUE, Psipho
 
 Regression tests cover share-link parsing, WireGuard block parsing, Xray configuration generation, and reconnect backoff. A successful CI build still does not prove that every protocol works on every network. Check the Actions workflow and test on-device before treating a build as stable.
 
+## v0.11.4 fix notes
+
+- Automatic MASQUE fallback now uses a broader full-subnet Thorough scan over HTTP/2 after Balanced finds no gateway, then tries HTTP/3 only if the wider scan also fails.
+- New connection attempts stop the previous Aether service session and serialize start/stop operations to prevent stale attempts from leaving duplicate cores behind.
+- Added unit tests for the scan fallback policy. A clean CI build cannot guarantee that a specific carrier/network allows MASQUE; the provided logs show intermittent DNS/API reachability and no verified gateway on the friend's network.
+
 ## Stable APK signing
 
 **Do not commit the release keystore or its passwords to this public repository.** The release workflow expects these GitHub Actions repository secrets:
