@@ -178,7 +178,7 @@ jobs:
           AZADLINK_STORE_PASSWORD: ${{ secrets.AZADLINK_STORE_PASSWORD }}
           AZADLINK_KEY_ALIAS: ${{ secrets.AZADLINK_KEY_ALIAS }}
           AZADLINK_KEY_PASSWORD: ${{ secrets.AZADLINK_KEY_PASSWORD }}
-          AZADLINK_STABLE_RELEASE_REQUEST: ${{ github.event.head_commit.message == 'Publish AzadLink v0.11.4 stable release' }}
+          AZADLINK_STABLE_RELEASE_REQUEST: ${{ github.event.head_commit.message == 'Publish AzadLink v0.11.5 stable release' }}
         run: |
           set -euo pipefail
           present=0
@@ -254,19 +254,19 @@ jobs:
             (
               github.ref == 'refs/heads/fix/aether-masque-fallback-v0.11.4' &&
               github.event_name == 'push' &&
-              github.event.head_commit.message == 'Publish AzadLink v0.11.4 stable release'
+              github.event.head_commit.message == 'Publish AzadLink v0.11.5 stable release'
             )
           )
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'v0.11.4' }}
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'v0.11.5' }}
           target_commitish: ${{ github.sha }}
           prerelease: false
-          name: AzadLink v0.11.4 · Stable
+          name: AzadLink v0.11.5 · Stable
           body: |
-            AzadLink ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'v0.11.4' }} stable release.
+            AzadLink ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'v0.11.5' }} stable release.
 
-            Includes the redesigned side drawer, protocol configuration management, app-routing and proxy settings, localized interface options, refined notification icon, and Aether MASQUE HTTP/2 defaults, balanced gateway ranking for better endpoint selection, and reuse of Aether's persisted last-working endpoint.
+            Includes the redesigned side drawer, protocol configuration management, app-routing and proxy settings, localized interface options, refined notification icon, and Aether MASQUE HTTP/3-first automatic connection with a matching Cloudflare SNI/authority, HTTP/2 fallback for networks that block QUIC, balanced gateway ranking, and reuse of Aether's persisted last-working endpoint.
 
             GitHub Actions runs regression tests for protocol parsing, WireGuard profile parsing, Xray config generation, and reconnect backoff, then verifies the signed APK includes the arm64-v8a Aether binary. Connection status messages distinguish a started local proxy/TUN bridge from end-to-end traffic verification; actual VPN reachability and throughput still require testing on the target device. The release build is rejected if the required native engine or ABI packaging is incorrect.
           files: app/build/outputs/apk/release/app-release.apk
