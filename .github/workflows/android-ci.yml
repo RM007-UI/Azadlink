@@ -211,7 +211,7 @@ jobs:
           set -euo pipefail
           for name in AZADLINK_KEYSTORE_BASE64 AZADLINK_STORE_PASSWORD AZADLINK_KEY_ALIAS AZADLINK_KEY_PASSWORD; do
             if [[ -z "${!name:-}" ]]; then
-              echo "::error::Missing GitHub Actions secret: $name. Configure the stable release keystore before tagging a release."
+              echo "::error::Missing GitHub Actions secret: $name. Configure the release keystore before tagging a release."
               exit 1
             fi
           done
