@@ -88,7 +88,7 @@ object AetherAutoConnector {
                 val routingPrefs = appContext.getSharedPreferences("azadlink_routing", Context.MODE_PRIVATE)
                 // Balanced ranks several verified gateways and chooses the fastest one.
                 // --quick-reconnect lets Aether reuse its persisted last-working endpoint on later connects.
-                // Keep HTTP/2 as the automatic carrier for networks where UDP/QUIC is filtered.
+                // Try native HTTP/3 first; HTTP/2 remains the automatic fallback when QUIC is blocked.
                 // Respect explicit advanced choices only when the user selected Manual mode.
                 val connectionMode = masquePrefs.getString("connection_mode", "auto") ?: "auto"
                 val automatic = connectionMode != "manual"
@@ -99,10 +99,12 @@ object AetherAutoConnector {
                 val fallbackScanMode = fallbackScanModeFor(scanMode, firstScanMode)
                 val ipVersion = if (automatic) "both" else (masquePrefs.getString("ip_version", "both") ?: "both")
                 val obfuscation = if (automatic) "firewall" else (masquePrefs.getString("obfuscation", "firewall") ?: "firewall")
-                val transport = if (automatic) "h2" else if ((masquePrefs.getString("transport", "h2") ?: "h2") == "h2") "h2" else "h3"
+                val transport = if (automatic) "h3" else if ((masquePrefs.getString("transport", "h2") ?: "h2") == "h2") "h2" else "h3"
                 val fragment = !automatic && masquePrefs.getBoolean("fragment", false) && transport == "h2"
                 val autoFallback = connectionMode == "auto" || masquePrefs.getBoolean("auto_fallback", true)
-                val masqueSni = if (automatic) "www.cloudflare.com" else
+                // The CONNECT authority is cloudflareaccess.com; matching SNI avoids routing the
+                // automatic HTTP/2 CONNECT-IP request to the wrong Cloudflare virtual host.
+                val masqueSni = if (automatic) "cloudflareaccess.com" else
                     (masquePrefs.getString("sni", "www.cloudflare.com")?.trim()?.takeIf { it.isNotEmpty() } ?: "www.cloudflare.com")
                 val manualEndpoint = if (automatic) "" else masquePrefs.getString("endpoint", "")?.trim().orEmpty()
 
