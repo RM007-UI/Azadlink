@@ -68,6 +68,8 @@ object ProtocolParser {
             return ProtocolProfile(protocol = Protocol.WIREGUARD, label = "WireGuard config", rawConfig = line)
         val scheme = schemeRegex.find(line)?.groupValues?.getOrNull(1) ?: return null
         val protocol = Protocol.fromScheme(scheme.lowercase(Locale.ROOT)) ?: return null
+        // X-VPN is a separately installed app, not an importable server-profile scheme.
+        if (protocol == Protocol.XVPN) return null
         val uri = runCatching { URI(line) }.getOrNull()
         val opaque = protocol in setOf(Protocol.PSIPHON, Protocol.MASTER_DNS, Protocol.STORM_DNS)
         val host = if (opaque) null else uri?.host?.takeIf { it.isNotBlank() }

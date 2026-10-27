@@ -15,7 +15,8 @@ enum class Protocol(
     VLESS("VLESS", "vless", EngineFamily.XRAY_CORE, "نیازمند core سازگار با Xray"),
     VMESS("VMess", "vmess", EngineFamily.XRAY_CORE, "نیازمند core سازگار با Xray"),
     TROJAN("Trojan", "trojan", EngineFamily.XRAY_CORE, "نیازمند core سازگار با Xray"),
-    SHADOWSOCKS("Shadowsocks", "ss", EngineFamily.XRAY_CORE, "نیازمند core سازگار با Xray");
+    SHADOWSOCKS("Shadowsocks", "ss", EngineFamily.XRAY_CORE, "نیازمند core سازگار با Xray"),
+    XVPN("X-VPN", "xvpn", EngineFamily.EXTERNAL_APP, "اتصال از طریق اپ رسمی X-VPN؛ وضعیت و قطع‌و‌وصل در همان اپ مدیریت می‌شود");
 
     companion object {
         fun fromScheme(scheme: String): Protocol? {
@@ -25,4 +26,4 @@ enum class Protocol(
     }
 }
 
-enum class EngineFamily { AETHER, XRAY_CORE, PSIPHON, WIREGUARD, MASTER_DNS, STORM_DNS, DNSTT }
+enum class EngineFamily { AETHER, XRAY_CORE, PSIPHON, WIREGUARD, MASTER_DNS, STORM_DNS, DNSTT, EXTERNAL_APP }

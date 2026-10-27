@@ -42,6 +42,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 class MainActivity : Activity() {
+    private val OFFICIAL_XVPN_PACKAGE = "com.security.xvpn.z35kb"
     private val profiles = mutableListOf<ProtocolProfile>()
     private var activeProfileFilter: Protocol? = null
     private lateinit var profileInput: EditText
@@ -300,6 +301,10 @@ private fun refreshState() {
     }
 
     private fun requestConnect(profile: ProtocolProfile) {
+        if (profile.protocol == Protocol.XVPN) {
+            openOfficialXvpn()
+            return
+        }
         if (profile.protocol == Protocol.PSIPHON) {
             requestPsiphonAutoConnect()
             return
@@ -314,6 +319,7 @@ private fun refreshState() {
                 }
                 Protocol.MASTER_DNS, Protocol.STORM_DNS -> ExternalEngineProfiles.parseDnsTunnel(profile)
                 Protocol.DNSTT -> ExternalEngineProfiles.parseDnstt(profile.rawConfig)
+                Protocol.XVPN -> Unit
             }
         }
         validation.exceptionOrNull()?.let {
@@ -685,15 +691,88 @@ private fun refreshState() {
             Protocol.DNSTT -> "DNSTT"
             Protocol.MASTER_DNS -> "Master DNS"
             Protocol.STORM_DNS -> "Storm DNS"
+            Protocol.XVPN -> "X-VPN (official app)"
         }
     }
 
     private fun onConnectionOrbTapped() {
+        // X-VPN owns its own Android VPN service, so never fake its state in AzadLink.
+        if (selectedProtocol() == Protocol.XVPN) {
+            openOfficialXvpn()
+            return
+        }
         when (connectionUiState) {
             ConnectionUiState.CONNECTING, ConnectionUiState.CONNECTED -> disconnectVpn()
             ConnectionUiState.DISCONNECTING -> Unit
             ConnectionUiState.DISCONNECTED, ConnectionUiState.FAILED -> connectSelectedProtocol()
         }
+    }
+
+
+    /**
+     * X-VPN does not publish an embedding SDK/API for third-party VPN clients.
+     * Hand off to its official Android app instead; don't report the external
+     * tunnel as connected because AzadLink cannot observe its state.
+     */
+    private fun openOfficialXvpn() {
+        val english = getSharedPreferences("azadlink_ui", MODE_PRIVATE)
+            .getString("language", "fa") == "en"
+        fun tr(fa: String, en: String) = if (english) en else fa
+
+        // Android supports one active VPN provider per user/profile. Stop AzadLink's
+        // own tunnel before switching to a separately installed VPN provider.
+        stopOtherTunnelEngines("none")
+        setConnectionTimerActive(false)
+        observedLiveTunnelConnection = false
+        setConnectionUiState(ConnectionUiState.DISCONNECTED)
+
+        val launchIntent = runCatching {
+            packageManager.getLaunchIntentForPackage(OFFICIAL_XVPN_PACKAGE)
+        }.getOrNull()
+
+        if (launchIntent != null) {
+            topStatus.text = tr(
+                "اپ رسمی X-VPN باز می‌شود؛ وضعیت اتصال در همان اپ است.",
+                "Opening official X-VPN; connection status stays in that app."
+            )
+            runCatching { startActivity(launchIntent) }
+                .onFailure {
+                    openOfficialXvpnDownload()
+                    Toast.makeText(
+                        this,
+                        tr("باز کردن X-VPN ناموفق بود؛ صفحهٔ رسمی نصب باز می‌شود.", "Could not open X-VPN; opening the official download page."),
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            return
+        }
+
+        topStatus.text = tr(
+            "X-VPN نصب نیست؛ صفحهٔ رسمی نصب باز می‌شود.",
+            "X-VPN is not installed; opening the official install page."
+        )
+        openOfficialXvpnDownload()
+    }
+
+    private fun openOfficialXvpnDownload() {
+        val targets = listOf(
+            "https://play.google.com/store/apps/details?id=$OFFICIAL_XVPN_PACKAGE",
+            "https://xvpn.io/free-vpn/android"
+        )
+        for (url in targets) {
+            val opened = runCatching {
+                startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)))
+                true
+            }.getOrDefault(false)
+            if (opened) return
+        }
+        val english = getSharedPreferences("azadlink_ui", MODE_PRIVATE)
+            .getString("language", "fa") == "en"
+        Toast.makeText(
+            this,
+            if (english) "Could not open the official X-VPN page." else "باز کردن صفحهٔ رسمی X-VPN ممکن نشد.",
+            Toast.LENGTH_LONG
+        ).show()
     }
 
     private fun connectSelectedProtocol() {
@@ -706,6 +785,7 @@ private fun refreshState() {
         when (val protocol = selectedProtocol()) {
             Protocol.MASQUE -> requestAutoConnect()
             Protocol.PSIPHON -> requestPsiphonAutoConnect()
+            Protocol.XVPN -> openOfficialXvpn()
             else -> {
                 val profile = profiles.firstOrNull { it.protocol == protocol }
                 if (profile != null) {
@@ -764,7 +844,10 @@ private fun refreshState() {
                 .putString("selected_connection_mode", "single")
                 .apply()
             selectedProtocolLabel?.text = title
-            selectedProtocolHint?.text = tr(
+            selectedProtocolHint?.text = if (protocol == Protocol.XVPN) tr(
+                "انتخاب شد · دایره را بزن تا اپ رسمی باز شود",
+                "Selected · tap the circle to open the official app"
+            ) else tr(
                 "انتخاب شد · برای اتصال روی دایره بزن",
                 "Selected · tap the circle to connect"
             )
@@ -800,6 +883,8 @@ private fun refreshState() {
         item("Aether · MASQUE", "Aether · MASQUE", "اتصال خودکار و تنظیمات پیشرفته", "Automatic connection and advanced options", !isChainSelected() && selectedProtocol() == Protocol.MASQUE) { choose(Protocol.MASQUE, "Aether · MASQUE") }
         heading("Psiphon", "Psiphon")
         item("Psiphon", "Psiphon", "اتصال مستقیم با موتور همراه برنامه", "Direct connection using the bundled engine", !isChainSelected() && selectedProtocol() == Protocol.PSIPHON) { choose(Protocol.PSIPHON, "Psiphon") }
+        heading("سرویس خارجی", "External VPN app")
+        item("X-VPN رسمی", "Official X-VPN", "اپ رسمی را باز می‌کند؛ اتصال در همان اپ مدیریت می‌شود", "Opens the official app; its connection is managed there", !isChainSelected() && selectedProtocol() == Protocol.XVPN) { choose(Protocol.XVPN, "X-VPN") }
         heading("مدیریت", "Manage")
         item("کانفیگ‌ها و سرورها", "Server configurations", "افزودن، اتصال و حذف پروفایل‌ها", "Add, connect and remove profiles") { dialog.dismiss(); showServerProfilesDialog() }
         item("حالت پروکسی", "Proxy mode", "تنظیم پراکسی محلی", "Configure local proxy mode") { dialog.dismiss(); showProxySettings() }

@@ -2,7 +2,7 @@
 
 AzadLink is an experimental Android VPN client integrating Aether/MASQUE, Psiphon, Xray share-link protocols, and DNS tunnel engines.
 
-## Current version: 0.11.5
+## Current version: 0.11.6
 
 
 
@@ -16,6 +16,12 @@ AzadLink is an experimental Android VPN client integrating Aether/MASQUE, Psipho
 - Psiphon is built from the pinned Aether-compatible fork in CI. Device-level startup and live traffic still need verification.
 
 Regression tests cover share-link parsing, WireGuard block parsing, Xray configuration generation, and reconnect backoff. A successful CI build still does not prove that every protocol works on every network. Check the Actions workflow and test on-device before treating a build as stable.
+
+## v0.11.6 X-VPN official-app handoff
+
+- Added X-VPN to the protocol drawer as an official-app handoff. If the official app is installed, AzadLink opens it; otherwise it opens the official Google Play listing/download page.
+- AzadLink stops its own tunnel before handing off and does not claim to know whether X-VPN connected. The X-VPN tunnel, first-run consent and connection status remain managed by the official X-VPN app.
+- This is not an embedded X-VPN engine: no public third-party embedding SDK/API was found, and the public Talaria code does not provision X-VPN servers or credentials.
 
 ## v0.11.5 fix notes
 

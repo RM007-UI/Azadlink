@@ -39,6 +39,11 @@ object EngineRegistry {
             EngineFamily.DNSTT, "DNSTT Go client", EngineReadiness.NEEDS_SERVER_CONFIG,
             "به دامنه، کلید عمومی، resolver و سرور راه‌دور نیاز دارد؛ پل SOCKS5 به TUN در برنامه قرار دارد.",
             "https://github.com/mahsanet/dnstt"
+        ),
+        EngineFamily.EXTERNAL_APP to EngineDescriptor(
+            EngineFamily.EXTERNAL_APP, "Official X-VPN app", EngineReadiness.NEEDS_INTEGRATION,
+            "گزینهٔ X-VPN اپ رسمی را باز می‌کند؛ موتور X-VPN یا وضعیت اتصال آن داخل AzadLink ادغام نشده است.",
+            "https://xvpn.io/free-vpn/android"
         )
     )
 
