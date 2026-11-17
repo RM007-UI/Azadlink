@@ -77,7 +77,7 @@ class MainActivity : Activity() {
         window.navigationBarColor = Color.rgb(12, 17, 28)
         window.decorView.systemUiVisibility = 0
         loadProfiles()
-        buildUi()
+        buildModernUi()
         refreshState()
     }
     override fun onStart() {
@@ -841,6 +841,489 @@ class MainActivity : Activity() {
         setContentView(root)
         selectTab(0)
         renderProfiles()
+    }
+
+    private fun buildModernUi() {
+        val pageBg = Color.rgb(248, 249, 253)
+        val white = Color.WHITE
+        val ink = Color.rgb(25, 32, 50)
+        val muted = Color.rgb(112, 122, 145)
+        val line = Color.rgb(229, 233, 243)
+        val blue = Color.rgb(40, 112, 245)
+        val purple = Color.rgb(126, 77, 236)
+        val green = Color.rgb(35, 165, 126)
+
+        window.statusBarColor = white
+        window.navigationBarColor = white
+        window.decorView.systemUiVisibility =
+            View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
+
+        fun shape(color: Int, radius: Int, stroke: Int? = null): GradientDrawable =
+            GradientDrawable().apply {
+                setColor(color)
+                cornerRadius = dp(radius).toFloat()
+                if (stroke != null) setStroke(dp(1), stroke)
+            }
+
+        fun gradient(radius: Int): GradientDrawable =
+            GradientDrawable(
+                GradientDrawable.Orientation.LEFT_RIGHT,
+                intArrayOf(blue, purple)
+            ).apply { cornerRadius = dp(radius).toFloat() }
+
+        fun gap(height: Int): View = View(this).apply {
+            layoutParams = LinearLayout.LayoutParams(1, dp(height))
+        }
+
+        fun label(value: String, size: Int = 14, color: Int = ink, bold: Boolean = false): TextView =
+            TextView(this).apply {
+                text = value
+                textSize = size.toFloat()
+                setTextColor(color)
+                if (bold) setTypeface(typeface, Typeface.BOLD)
+                includeFontPadding = false
+                gravity = Gravity.CENTER_VERTICAL
+            }
+
+        fun heading(target: LinearLayout, title: String, subtitle: String) {
+            target.addView(label(title, 24, ink, true))
+            target.addView(gap(5))
+            target.addView(label(subtitle, 13, muted))
+            target.addView(gap(18))
+        }
+
+        fun section(target: LinearLayout, title: String, subtitle: String? = null) {
+            target.addView(label(title, 16, ink, true))
+            if (!subtitle.isNullOrBlank()) {
+                target.addView(gap(4))
+                target.addView(label(subtitle, 12, muted))
+            }
+            target.addView(gap(10))
+        }
+
+        fun primaryAction(target: LinearLayout, title: String, action: () -> Unit, height: Int = 54) {
+            val item = TextView(this).apply {
+                text = title
+                textSize = 15f
+                setTypeface(typeface, Typeface.BOLD)
+                setTextColor(white)
+                gravity = Gravity.CENTER
+                background = gradient(17)
+                isClickable = true
+                isFocusable = true
+                setOnClickListener { action() }
+            }
+            target.addView(item, LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(height)
+            ))
+        }
+
+        fun secondaryAction(target: LinearLayout, title: String, action: () -> Unit, height: Int = 50) {
+            val item = TextView(this).apply {
+                text = title
+                textSize = 14f
+                setTypeface(typeface, Typeface.BOLD)
+                setTextColor(Color.rgb(67, 83, 117))
+                gravity = Gravity.CENTER
+                background = shape(white, 16, line)
+                isClickable = true
+                isFocusable = true
+                setOnClickListener { action() }
+            }
+            target.addView(item, LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(height)
+            ))
+        }
+
+        fun actionCard(
+            target: LinearLayout,
+            symbol: String,
+            title: String,
+            subtitle: String,
+            tint: Int = blue,
+            action: () -> Unit
+        ) {
+            val card = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(14), dp(13), dp(14), dp(13))
+                background = shape(white, 18, line)
+                isClickable = true
+                isFocusable = true
+                setOnClickListener { action() }
+            }
+            val icon = TextView(this).apply {
+                text = symbol
+                textSize = 17f
+                setTypeface(typeface, Typeface.BOLD)
+                setTextColor(tint)
+                gravity = Gravity.CENTER
+                background = shape(Color.rgb(241, 244, 255), 14)
+                layoutParams = LinearLayout.LayoutParams(dp(44), dp(44))
+            }
+            val copy = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(11), 0, dp(5), 0)
+            }
+            copy.addView(label(title, 14, ink, true))
+            copy.addView(gap(4))
+            copy.addView(label(subtitle, 11, muted))
+            card.addView(icon)
+            card.addView(copy, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            card.addView(label("‹", 24, muted))
+            val params = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+            params.bottomMargin = dp(9)
+            target.addView(card, params)
+        }
+
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(pageBg)
+            layoutDirection = View.LAYOUT_DIRECTION_LOCALE
+        }
+
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(18), dp(10), dp(18), dp(10))
+            setBackgroundColor(white)
+        }
+        val logo = android.widget.ImageView(this).apply {
+            setImageResource(R.drawable.ic_azadlink)
+            scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+            layoutParams = LinearLayout.LayoutParams(dp(43), dp(43))
+        }
+        val brand = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(10), 0, 0, 0)
+        }
+        brand.addView(label("AzadLink", 20, ink, true))
+        brand.addView(gap(3))
+        brand.addView(label("ارتباط آزاد، ساده و یکپارچه", 10, muted))
+        header.addView(logo)
+        header.addView(brand, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        val settings = TextView(this).apply {
+            text = "⚙"
+            textSize = 21f
+            gravity = Gravity.CENTER
+            setTextColor(ink)
+            background = shape(pageBg, 14, line)
+            layoutParams = LinearLayout.LayoutParams(dp(43), dp(43))
+            isClickable = true
+            isFocusable = true
+            setOnClickListener { showRoutingSettings() }
+        }
+        header.addView(settings)
+        root.addView(header)
+
+        val scroll = ScrollView(this).apply {
+            isFillViewport = true
+            clipToPadding = false
+            overScrollMode = View.OVER_SCROLL_NEVER
+            setBackgroundColor(pageBg)
+        }
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(17), dp(16), dp(22))
+        }
+        scroll.addView(content)
+        val pages = mutableListOf<LinearLayout>()
+        fun addPage(build: (LinearLayout) -> Unit) {
+            val page = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                visibility = View.GONE
+            }
+            content.addView(page, LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+            ))
+            pages.add(page)
+            build(page)
+        }
+
+        // HOME
+        addPage { page ->
+            val statusCard = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(14), dp(13), dp(14), dp(13))
+                background = shape(white, 17, line)
+            }
+            val statusDot = TextView(this).apply {
+                text = "●"
+                textSize = 12f
+                setTextColor(green)
+                setPadding(0, 0, dp(8), 0)
+            }
+            topStatus = label("آمادهٔ اتصال", 12, ink, true)
+            topStatus.maxLines = 2
+            topStatus.ellipsize = android.text.TextUtils.TruncateAt.END
+            statusCard.addView(statusDot)
+            statusCard.addView(topStatus, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            val report = label("گزارش", 12, purple, true).apply {
+                setPadding(dp(8), dp(6), 0, dp(6))
+                isClickable = true
+                setOnClickListener { showTunnelLogs() }
+            }
+            statusCard.addView(report)
+            page.addView(statusCard)
+            page.addView(gap(15))
+
+            val hero = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER_HORIZONTAL
+                setPadding(dp(20), dp(23), dp(20), dp(20))
+                background = GradientDrawable(
+                    GradientDrawable.Orientation.TL_BR,
+                    intArrayOf(Color.rgb(235, 243, 255), Color.rgb(246, 239, 255))
+                ).apply {
+                    cornerRadius = dp(25).toFloat()
+                    setStroke(dp(1), Color.rgb(226, 232, 250))
+                }
+            }
+            val emblem = TextView(this).apply {
+                text = "A"
+                textSize = 30f
+                setTypeface(typeface, Typeface.BOLD)
+                setTextColor(white)
+                gravity = Gravity.CENTER
+                background = gradient(25)
+                layoutParams = LinearLayout.LayoutParams(dp(78), dp(78))
+                elevation = dp(4).toFloat()
+            }
+            hero.addView(emblem)
+            hero.addView(gap(18))
+            hero.addView(label("آزادی در دستان شماست", 21, ink, true))
+            hero.addView(gap(7))
+            hero.addView(label(
+                "برای شروع، به‌سادگی به یکی از موتورهای اتصال وصل شو.",
+                12, muted
+            ))
+            hero.addView(gap(20))
+            primaryAction(hero, "⚡   اتصال سریع", { requestAutoConnect() }, 56)
+            hero.addView(gap(9))
+            secondaryAction(hero, "☷   انتخاب سرور", { showServerPicker() }, 51)
+            hero.addView(gap(12))
+            hero.addView(label("اتصال سریع از موتور Aether / MASQUE استفاده می‌کند.", 10, muted))
+            page.addView(hero)
+            page.addView(gap(19))
+
+            section(page, "دسترسی سریع", "بخش‌های پرکاربرد AzadLink")
+            actionCard(page, "⌘", "سرورها و پروفایل‌ها", "افزودن لینک و مدیریت کانفیگ‌های ذخیره‌شده", blue) {
+                selectTab(1)
+            }
+            actionCard(page, "◈", "موتورها و پروتکل‌ها", "MASQUE، Psiphon، DNS و پروتکل‌های Xray", purple) {
+                selectTab(2)
+            }
+            actionCard(page, "⚙", "تنظیمات اتصال", "مسیریابی برنامه‌ها و تنظیمات پیشرفته", green) {
+                selectTab(3)
+            }
+            page.addView(gap(8))
+            val note = label(
+                "وضعیت موفق اتصال فقط پس از تأیید واقعی تونل نمایش داده می‌شود؛ اضافه‌کردن پروفایل به‌تنهایی به معنی اتصال نیست.",
+                11, muted
+            )
+            note.setPadding(dp(4), dp(8), dp(4), dp(5))
+            page.addView(note)
+        }
+
+        // SERVERS
+        addPage { page ->
+            heading(page, "سرورها", "پروفایل‌های خودت را اضافه و مدیریت کن.")
+            section(page, "پروتکل‌های سروری", "برای مشاهدهٔ جزئیات یا اتصال، یک پروتکل را انتخاب کن.")
+            actionCard(page, "V", "VLESS", "Reality و TLS از طریق Xray", blue) { showProtocolDetail(Protocol.VLESS) }
+            actionCard(page, "M", "VMess", "ورود لینک و اجرای کانفیگ با Xray", purple) { showProtocolDetail(Protocol.VMESS) }
+            actionCard(page, "T", "Trojan", "پروکسی مبتنی بر TLS", green) { showProtocolDetail(Protocol.TROJAN) }
+            actionCard(page, "S", "Shadowsocks", "پروکسی رمزگذاری‌شده", Color.rgb(216, 133, 62)) { showProtocolDetail(Protocol.SHADOWSOCKS) }
+            actionCard(page, "W", "WireGuard", "تونل مبتنی بر کلید", Color.rgb(55, 139, 190)) { showProtocolDetail(Protocol.WIREGUARD) }
+            page.addView(gap(8))
+            section(page, "افزودن پروفایل", "لینک سرور را وارد کن؛ نوع آن خودکار شناسایی می‌شود.")
+            val inputShell = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(13), dp(11), dp(13), dp(11))
+                background = shape(white, 17, line)
+            }
+            profileInput = EditText(this).apply {
+                hint = "vless://  ·  vmess://  ·  trojan://  ·  ss://"
+                setHintTextColor(Color.rgb(157, 166, 184))
+                setTextColor(ink)
+                textSize = 13f
+                minLines = 3
+                maxLines = 6
+                gravity = Gravity.TOP or Gravity.START
+                setPadding(dp(4), dp(7), dp(4), dp(7))
+                background = null
+                includeFontPadding = false
+            }
+            inputShell.addView(profileInput, LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+            ))
+            page.addView(inputShell)
+            page.addView(gap(9))
+            primaryAction(page, "＋   تشخیص و افزودن کانفیگ", { importProfiles() }, 49)
+            page.addView(gap(18))
+            section(page, "پروفایل‌های من", "پروفایل‌های ذخیره‌شده روی همین دستگاه")
+            profileList = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+            page.addView(profileList)
+            page.addView(gap(7))
+            page.addView(label(
+                "افزودن موفق کانفیگ به معنی تأییدشدن اتصال سرور نیست؛ وضعیت موتور پس از اتصال بررسی می‌شود.",
+                11, muted
+            ))
+        }
+
+        // ENGINES
+        addPage { page ->
+            heading(page, "موتورها و پروتکل‌ها", "موتور مناسب شبکه و کانفیگت را انتخاب کن.")
+            section(page, "اتصال‌های مستقل", "برای راه‌اندازی و تنظیمات هر موتور وارد جزئیات شو.")
+            actionCard(page, "A", "Aether / MASQUE", "اتصال خودکار و تنظیمات پیشرفتهٔ gateway", blue) {
+                showProtocolDetail(Protocol.MASQUE)
+            }
+            actionCard(page, "P", "Psiphon", "اتصال مستقیم و انتخاب موقعیت خروجی", purple) {
+                showProtocolDetail(Protocol.PSIPHON)
+            }
+            page.addView(gap(8))
+            section(page, "تونل‌های DNS", "این موتورها به سرور و تنظیمات اختصاصی نیاز دارند.")
+            actionCard(page, "D", "DNSTT", "تونل DNS با مشخصات سرور اختصاصی", Color.rgb(55, 139, 190)) {
+                showProtocolDetail(Protocol.DNSTT)
+            }
+            actionCard(page, "M", "Master DNS", "موتور MasterDnsVPN", green) {
+                showProtocolDetail(Protocol.MASTER_DNS)
+            }
+            actionCard(page, "S", "Storm DNS", "موتور StormDNS", purple) {
+                showProtocolDetail(Protocol.STORM_DNS)
+            }
+            page.addView(gap(8))
+            val note = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(13), dp(12), dp(13), dp(12))
+                background = shape(Color.rgb(255, 250, 235), 15, Color.rgb(245, 231, 190))
+            }
+            note.addView(label("ⓘ", 18, Color.rgb(177, 124, 25), true))
+            note.addView(label(
+                "هر موتور باید آماده‌بودن تونل را جداگانه تأیید کند؛ نمایش این گزینه به‌تنهایی به معنی آماده‌بودن آن نیست.",
+                11, Color.rgb(113, 91, 48)
+            ).apply { setPadding(dp(9), 0, 0, 0) })
+            page.addView(note)
+        }
+
+        // SETTINGS
+        addPage { page ->
+            heading(page, "تنظیمات", "کنترل جزئیات اتصال در یک مکان.")
+            actionCard(page, "⇄", "مسیریابی برنامه‌ها", "انتخاب برنامه‌هایی که از تونل عبور می‌کنند", blue) {
+                showRoutingSettings()
+            }
+            actionCard(page, "◈", "تنظیمات پیشرفتهٔ MASQUE", "HTTP/2، IP، SNI و گزینه‌های اسکن", purple) {
+                showMasqueAdvancedSettings()
+            }
+            actionCard(page, "⌖", "موقعیت Psiphon", "انتخاب کشور خروجی یا حالت خودکار", green) {
+                showPsiphonSettings()
+            }
+            actionCard(page, "≡", "گزارش اتصال", "بررسی گزارش وضعیت و خطاهای موتور", Color.rgb(73, 125, 176)) {
+                showTunnelLogs()
+            }
+            page.addView(gap(15))
+            val about = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(15), dp(14), dp(15), dp(14))
+                background = shape(white, 18, line)
+            }
+            about.addView(label("دربارهٔ AzadLink", 14, ink, true))
+            about.addView(gap(6))
+            about.addView(label("یک رابط یکپارچه برای مدیریت چند موتور و پروتکل اتصال.", 12, muted))
+            about.addView(gap(5))
+            about.addView(label("نسخهٔ برنامه: 0.9.1", 11, muted))
+            page.addView(about)
+        }
+
+        val navItems = listOf(
+            "خانه" to "⌂",
+            "سرورها" to "⌘",
+            "پروتکل‌ها" to "◈",
+            "تنظیمات" to "⚙"
+        )
+        val nav = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            setPadding(dp(8), dp(7), dp(8), dp(7))
+            setBackgroundColor(white)
+            elevation = dp(8).toFloat()
+        }
+        val navTabs = mutableListOf<LinearLayout>()
+        fun selectTab(index: Int) {
+            pages.forEachIndexed { i, page ->
+                page.visibility = if (i == index) View.VISIBLE else View.GONE
+            }
+            navTabs.forEachIndexed { i, tab ->
+                val active = i == index
+                tab.background = shape(
+                    if (active) Color.rgb(239, 242, 255) else Color.TRANSPARENT,
+                    14
+                )
+                val icon = tab.getChildAt(0) as TextView
+                val caption = tab.getChildAt(1) as TextView
+                icon.setTextColor(if (active) blue else muted)
+                caption.setTextColor(if (active) blue else muted)
+                caption.setTypeface(caption.typeface, if (active) Typeface.BOLD else Typeface.NORMAL)
+            }
+            scroll.scrollTo(0, 0)
+        }
+        navItems.forEachIndexed { index, item ->
+            val tab = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER
+                setPadding(dp(4), dp(7), dp(4), dp(6))
+                background = shape(if (index == 0) Color.rgb(239, 242, 255) else Color.TRANSPARENT, 14)
+                addView(label(item.second, 19, if (index == 0) blue else muted).apply {
+                    gravity = Gravity.CENTER
+                })
+                addView(label(item.first, 10, if (index == 0) blue else muted).apply {
+                    gravity = Gravity.CENTER
+                    setPadding(0, dp(3), 0, 0)
+                })
+                isClickable = true
+                isFocusable = true
+                setOnClickListener { selectTab(index) }
+                layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+            }
+            navTabs.add(tab)
+            nav.addView(tab)
+        }
+
+        root.addView(scroll, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f
+        ))
+        val navParams = LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        )
+        navParams.setMargins(dp(10), dp(3), dp(10), dp(7))
+        root.addView(nav, navParams)
+        setContentView(root)
+        selectTab(0)
+        renderProfiles()
+    }
+
+    private fun showServerPicker() {
+        if (profiles.isEmpty()) {
+            AlertDialog.Builder(this)
+                .setTitle("هنوز سروری اضافه نشده")
+                .setMessage("برای انتخاب سرور، ابتدا از بخش «سرورها» یک لینک یا پروفایل وارد کن.")
+                .setPositiveButton("باشه", null)
+                .show()
+            return
+        }
+        val labels = profiles.map { profile ->
+            profile.label + "   ·   " + profile.protocol.displayName
+        }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle("انتخاب سرور")
+            .setItems(labels) { _, which ->
+                profiles.getOrNull(which)?.let { requestConnect(it) }
+            }
+            .setNegativeButton("بستن", null)
+            .show()
     }
 
     private fun showTunnelLogs() {
