@@ -437,8 +437,11 @@ class MainActivity : Activity() {
             page.addView(gap(15))
             section(page, tr("پروفایل‌های من", "My profiles"),
                 tr("پروفایل‌ها فقط روی همین دستگاه ذخیره می‌شوند.", "Profiles are stored only on this device."))
-            profileList = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-            page.addView(profileList); page.addView(gap(10))
+            page.addView(label(
+                tr("تعداد پروفایل‌های ذخیره‌شده: " + profiles.size, "Saved profiles: " + profiles.size),
+                12, muted
+            ))
+            page.addView(gap(10))
             section(page, tr("دسترسی بر اساس پروتکل", "Browse by protocol"))
             card(page, "V", "VLESS", tr("نمایش یا افزودن پروفایل VLESS", "View or add VLESS profiles"), blue) { showServerProfilesDialog(Protocol.VLESS) }
             card(page, "M", "VMess", tr("نمایش یا افزودن پروفایل VMess", "View or add VMess profiles"), purple) { showServerProfilesDialog(Protocol.VMESS) }
