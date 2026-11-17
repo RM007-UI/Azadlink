@@ -26,10 +26,19 @@ object AetherAutoConnector {
     private val mainHandler = Handler(Looper.getMainLooper())
 
     private val connectionGeneration = AtomicInteger(0)
+    // Serialize generation changes with service starts/stops so a stale retry cannot
+    // resurrect an older Aether session after a newer attempt has begun.
+    private val lifecycleLock = Any()
 
     fun connect(context: Context, onStatus: (String) -> Unit) {
-        val generation = connectionGeneration.incrementAndGet()
         val appContext = context.applicationContext
+        val generation = synchronized(lifecycleLock) {
+            val next = connectionGeneration.incrementAndGet()
+            // The previous implementation invalidated old callbacks but left the old core
+            // alive. Stop it before preparing the replacement attempt.
+            AetherVpnService.stop(appContext)
+            next
+        }
         Thread({
             try {
                 onStatusOnMain(onStatus, "در حال بررسی موتور Aether…")
@@ -77,24 +86,29 @@ object AetherAutoConnector {
                 onStatusOnMain(onStatus, "هویت آماده است؛ در حال راه‌اندازی تونل MASQUE…")
                 val masquePrefs = appContext.getSharedPreferences("azadlink_masque", Context.MODE_PRIVATE)
                 val routingPrefs = appContext.getSharedPreferences("azadlink_routing", Context.MODE_PRIVATE)
-                // New installs and Auto/Default presets prefer the known-good HTTP/2 path.
+                // Balanced ranks several verified gateways and chooses the fastest one.
+                // --quick-reconnect lets Aether reuse its persisted last-working endpoint on later connects.
+                // Try native HTTP/3 first; HTTP/2 remains the automatic fallback when QUIC is blocked.
                 // Respect explicit advanced choices only when the user selected Manual mode.
                 val connectionMode = masquePrefs.getString("connection_mode", "auto") ?: "auto"
                 val automatic = connectionMode != "manual"
                 val scanMode = if (automatic) "balanced" else
                     (masquePrefs.getString("scan_mode", "balanced") ?: "balanced")
                         .lowercase().let { if (it in setOf("turbo", "balanced", "thorough", "stealth", "ironclad")) it else "balanced" }
-                val fallbackScanMode = if (scanMode == "thorough") "ironclad" else "thorough"
+                val firstScanMode = if (scanMode in setOf("thorough", "stealth", "ironclad")) "turbo" else scanMode
+                val fallbackScanMode = fallbackScanModeFor(scanMode, firstScanMode)
                 val ipVersion = if (automatic) "both" else (masquePrefs.getString("ip_version", "both") ?: "both")
                 val obfuscation = if (automatic) "firewall" else (masquePrefs.getString("obfuscation", "firewall") ?: "firewall")
-                val transport = if (automatic) "h2" else if ((masquePrefs.getString("transport", "h2") ?: "h2") == "h2") "h2" else "h3"
+                val transport = if (automatic) "h3" else if ((masquePrefs.getString("transport", "h2") ?: "h2") == "h2") "h2" else "h3"
                 val fragment = !automatic && masquePrefs.getBoolean("fragment", false) && transport == "h2"
                 val autoFallback = connectionMode == "auto" || masquePrefs.getBoolean("auto_fallback", true)
-                val masqueSni = if (automatic) "www.cloudflare.com" else
+                // The CONNECT authority is cloudflareaccess.com; matching SNI avoids routing the
+                // automatic HTTP/2 CONNECT-IP request to the wrong Cloudflare virtual host.
+                val masqueSni = if (automatic) "cloudflareaccess.com" else
                     (masquePrefs.getString("sni", "www.cloudflare.com")?.trim()?.takeIf { it.isNotEmpty() } ?: "www.cloudflare.com")
                 val manualEndpoint = if (automatic) "" else masquePrefs.getString("endpoint", "")?.trim().orEmpty()
 
-                fun startAttempt(attemptScanMode: String, fallbackAttempt: Boolean) {
+                fun startAttempt(attemptScanMode: String, fallbackAttempt: Boolean, attemptTransport: String = transport, transportFallbackAttempt: Boolean = false) {
                     if (connectionGeneration.get() != generation) return
                     val arguments = mutableListOf(
                         "--bind", "127.0.0.1:" + SOCKS_PORT,
@@ -104,17 +118,18 @@ object AetherAutoConnector {
                         "--ip", ipVersion,
                         "--validate-secs", "10",
                         "--reconnect-secs", "2",
+                        "--quick-reconnect",
                         "--noize", obfuscation,
                         "--masque",
                         "--masque-sni", masqueSni
                     )
-                    if (transport == "h2") arguments.add("--h2")
+                    if (attemptTransport == "h2") arguments.add("--h2")
                     if (fragment) arguments.add("--fragment")
 
                     val settings = mapOf<String, Any?>(
                         "protocol" to "masque",
-                        "modeLabel" to ("MASQUE " + transport.uppercase()),
-                        "transport" to transport,
+                        "modeLabel" to ("MASQUE " + attemptTransport.uppercase()),
+                        "transport" to attemptTransport,
                         "scanMode" to attemptScanMode,
                         "obfuscation" to obfuscation,
                         "noizeProfile" to obfuscation,
@@ -135,51 +150,103 @@ object AetherAutoConnector {
                     )
 
                     var sawConnecting = false
+                    val attemptFinished = AtomicInteger(0)
                     lateinit var statusListener: (org.bepass.oblivion.vpn.TunnelSnapshot) -> Unit
+                    lateinit var watchdog: Runnable
+
+                    fun finishFailure(reason: String) {
+                        if (!attemptFinished.compareAndSet(0, 1)) return
+                        mainHandler.removeCallbacks(watchdog)
+                        TunnelBus.removeStatusListener(statusListener)
+                        // An old timeout must never stop a newer session that has already started.
+                        val stoppedCurrentAttempt = synchronized(lifecycleLock) {
+                            if (connectionGeneration.get() != generation) false
+                            else {
+                                AetherVpnService.stop(appContext)
+                                true
+                            }
+                        }
+                        if (!stoppedCurrentAttempt) return
+                        if (!fallbackAttempt && autoFallback) {
+                            // A balanced scan samples only part of each subnet. If it finds no
+                            // gateway, widen the address search before changing transport.
+                            onStatusOnMain(
+                                onStatus,
+                                "$reason؛ در حال گسترش اسکن به «$fallbackScanMode» با HTTP/2…"
+                            )
+                            mainHandler.postDelayed({
+                                if (connectionGeneration.get() == generation) {
+                                    startAttempt(fallbackScanMode, true, "h2", false)
+                                }
+                            }, 1800L)
+                        } else if (autoFallback && attemptTransport == "h2" && !transportFallbackAttempt) {
+                            // Only try HTTP/3 after the wider H2 scan failed; many networks filter QUIC.
+                            onStatusOnMain(onStatus, "$reason؛ اسکن جایگزین هم ناموفق بود؛ در حال آزمون HTTP/3…")
+                            AetherVpnService.stop(appContext)
+                            mainHandler.postDelayed({
+                                if (connectionGeneration.get() == generation) {
+                                    startAttempt(attemptScanMode, fallbackAttempt, "h3", true)
+                                }
+                            }, 1800L)
+                        } else {
+                            onStatusOnMain(
+                                onStatus,
+                                "$reason اتصال MASQUE برقرار نشد. حالت اسکن: $attemptScanMode؛ گزارش موتور را بررسی کن."
+                            )
+                        }
+                    }
+
                     statusListener = { snapshot ->
                         if (connectionGeneration.get() != generation) {
+                            mainHandler.removeCallbacks(watchdog)
                             TunnelBus.removeStatusListener(statusListener)
                         } else {
                             if (snapshot.stage == TunnelStage.CONNECTING || snapshot.stage == TunnelStage.VALIDATING) {
                                 sawConnecting = true
                             }
-                            if (!sawConnecting) {
-                                // TunnelBus immediately replays the previous session's snapshot on registration.
-                                // Ignore it until this attempt reports its own CONNECTING/VALIDATING stage.
-                                Unit
-                            } else when (snapshot.stage) {
+                            if (sawConnecting) when (snapshot.stage) {
                                 TunnelStage.CONNECTED -> {
-                                    TunnelBus.removeStatusListener(statusListener)
-                                    val prefix = if (fallbackAttempt) "تونل MASQUE در تلاش جایگزین برقرار شد." else "تونل MASQUE برقرار شد."
-                                    onStatusOnMain(onStatus, prefix + " انتقال " + transport.uppercase() + "؛ عبور داده از موتور تأیید شد.")
+                                    if (attemptFinished.compareAndSet(0, 1)) {
+                                        mainHandler.removeCallbacks(watchdog)
+                                        TunnelBus.removeStatusListener(statusListener)
+                                        val prefix = if (fallbackAttempt) "تونل MASQUE در تلاش جایگزین برقرار شد." else "تونل MASQUE برقرار شد."
+                                        onStatusOnMain(onStatus, prefix + " انتقال " + attemptTransport.uppercase() + "؛ پراکسی موتور پاسخ داد و رابط VPN برقرار شد.")
+                                    }
                                 }
                                 TunnelStage.FAILED -> {
-                                    TunnelBus.removeStatusListener(statusListener)
-                                    if (!fallbackAttempt && autoFallback && connectionGeneration.get() == generation) {
-                                        onStatusOnMain(onStatus, "اسکن " + attemptScanMode + " gateway پیدا نکرد؛ در حال شروع تلاش جایگزین با اسکن thorough…")
-                                        mainHandler.postDelayed({
-                                            if (connectionGeneration.get() == generation) {
-                                                startAttempt(fallbackScanMode, true)
-                                            }
-                                        }, 2200L)
-                                    } else {
-                                        onStatusOnMain(onStatus, "اتصال MASQUE ناموفق بود؛ گزارش موتور را باز کن. آخرین حالت اسکن: " + attemptScanMode)
-                                    }
+                                    val detail = snapshot.message?.trim()?.takeIf { it.isNotEmpty() }
+                                        ?: "هسته پس از اسکن $attemptScanMode اتصال قابل‌استفاده‌ای پیدا نکرد"
+                                    finishFailure(detail)
                                 }
                                 else -> Unit
                             }
                         }
                     }
+                    watchdog = Runnable {
+                        val timeoutSeconds = attemptTimeoutMs(attemptScanMode, fallbackAttempt, automatic) / 1000L
+                        finishFailure("مهلت تلاش اسکن $attemptScanMode پس از $timeoutSeconds ثانیه تمام شد")
+                    }
                     TunnelBus.addStatusListener(statusListener)
                     try {
-                        AetherVpnService.start(appContext, TunnelConfig.fromMap(settings, arguments))
+                        synchronized(lifecycleLock) {
+                            if (connectionGeneration.get() != generation) {
+                                mainHandler.removeCallbacks(watchdog)
+                                TunnelBus.removeStatusListener(statusListener)
+                                return
+                            }
+                            AetherVpnService.start(appContext, TunnelConfig.fromMap(settings, arguments))
+                        }
+                        mainHandler.postDelayed(watchdog, attemptTimeoutMs(attemptScanMode, fallbackAttempt, automatic))
                     } catch (error: Throwable) {
-                        TunnelBus.removeStatusListener(statusListener)
-                        onStatusOnMain(onStatus, "خطای اتصال: " + (error.message ?: error.javaClass.simpleName))
+                        if (attemptFinished.compareAndSet(0, 1)) {
+                            mainHandler.removeCallbacks(watchdog)
+                            TunnelBus.removeStatusListener(statusListener)
+                            onStatusOnMain(onStatus, "خطای اتصال: " + (error.message ?: error.javaClass.simpleName))
+                        }
                     }
                 }
 
-                startAttempt(scanMode, false)
+                startAttempt(firstScanMode, false)
             } catch (error: Throwable) {
                 onStatusOnMain(onStatus, "خطای اتصال: " + (error.message ?: error.javaClass.simpleName))
             }
@@ -187,8 +254,37 @@ object AetherAutoConnector {
     }
 
     fun disconnect(context: Context) {
-        connectionGeneration.incrementAndGet()
-        AetherVpnService.stop(context.applicationContext)
+        synchronized(lifecycleLock) {
+            connectionGeneration.incrementAndGet()
+            AetherVpnService.stop(context.applicationContext)
+        }
+    }
+
+    /**
+     * Balanced samples candidate addresses; thorough scans the full subnet.
+     * Use the broader scan as the automatic fallback when balanced finds no gateway.
+     */
+    internal fun fallbackScanModeFor(scanMode: String, firstScanMode: String): String {
+        if (firstScanMode != scanMode) return scanMode
+        return when (scanMode.trim().lowercase()) {
+            "balanced" -> "thorough"
+            "turbo", "fast" -> "balanced"
+            else -> "balanced"
+        }
+    }
+
+    private fun attemptTimeoutMs(scanMode: String, fallbackAttempt: Boolean, automatic: Boolean): Long {
+        // Balanced compares multiple verified endpoints; allow its ranking window to finish.
+        // Turbo fallback remains the short path if the first scan cannot connect.
+        if (automatic && !fallbackAttempt && scanMode.equals("balanced", ignoreCase = true)) {
+            return 190_000L
+        }
+        return when (scanMode.trim().lowercase()) {
+            "turbo", "fast" -> 115_000L
+            "thorough", "deep", "pro" -> 370_000L
+            "stealth", "quiet", "ironclad", "real", "verify", "guaranteed" -> 250_000L
+            else -> 190_000L
+        }
     }
 
     private fun hasIdentity(file: File): Boolean = runCatching {
