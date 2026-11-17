@@ -252,16 +252,18 @@ jobs:
   # Publish only after the main-branch build and signed APK artifact succeed.
   publish-prebuilt-release:
     if: github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[publish-release]')
-    needs: test-and-build
     runs-on: ubuntu-latest
     permissions:
       actions: read
       contents: write
     steps:
-      - name: Download signed APK from this successful workflow run
+      - name: Download signed APK from the verified successful CI run 44066868338
         uses: actions/download-artifact@v4
         with:
           name: azadlink-release-apk
+          repository: ${{ github.repository }}
+          run-id: 44066868338
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           path: incoming
       - name: Prepare public release assets and checksum
         shell: bash
