@@ -2,11 +2,12 @@
 
 AzadLink is an experimental Android VPN client integrating Aether/MASQUE, Psiphon, Xray share-link protocols, and DNS tunnel engines.
 
-## Current version: 0.9.1
+## Current version: 0.9.2
 
 
 
-- Four bottom navigation sections: server protocols, DNS tunnels, Aether/MASQUE, and Psiphon.
+- Four bottom navigation sections: Home, server profiles, engines/protocols, and settings.
+- Modern minimal Persian-first interface with quick connect, server picker, and light blue/purple visual system.
 - MASQUE advanced options: HTTP/2 vs engine default, obfuscation profile, IP family, and TLS SNI.
 - App-based split tunneling: route all apps, exclude selected apps, or route only selected apps.
 - Launcher icon and release-signing configuration.

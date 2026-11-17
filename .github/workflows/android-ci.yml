@@ -228,13 +228,13 @@ jobs:
         if: github.event_name != 'pull_request' && startsWith(github.ref, 'refs/tags/v') && steps.signing.outputs.enabled == 'true'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'v0.9.1' }}
+          tag_name: ${{ github.ref_name }}
           target_commitish: ${{ github.sha }}
-          name: AzadLink v0.9.1
+          name: AzadLink ${{ github.ref_name }}
           body: |
-            AzadLink v0.9.1 — signed Android APK.
+            AzadLink ${{ github.ref_name }} — signed Android APK.
 
-            This build includes the current Aether/Psiphon integration and the build-time compatibility check for the Psiphon protocol reported on-device. Device/network behavior can vary; test tunnel startup and traffic on your own connection.
+            This release includes the modern minimal Persian-first interface, server profile management, and the existing Aether/Psiphon/Xray/DNS engine integrations. A successful build does not guarantee every protocol works on every network; verify tunnel startup and real traffic on-device.
           files: app/build/outputs/apk/release/app-release.apk
           generate_release_notes: true
           fail_on_unmatched_files: true
@@ -249,8 +249,7 @@ jobs:
             echo '- A successful APK build does not by itself mean the VPN tunnel works.'
           } >> "$GITHUB_STEP_SUMMARY"
 
-  # For this one-time publication, reuse the signed APK from the latest successful build.
-  # The Android source has not changed since that build; only this workflow has changed.
+  # Publish only after the main-branch build and signed APK artifact succeed.
   publish-prebuilt-release:
     if: github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[publish-release]')
     runs-on: ubuntu-latest
@@ -258,12 +257,12 @@ jobs:
       actions: read
       contents: write
     steps:
-      - name: Download signed APK from the verified successful build
+      - name: Download signed APK from the verified successful CI run 44066868338
         uses: actions/download-artifact@v4
         with:
           name: azadlink-release-apk
           repository: ${{ github.repository }}
-          run-id: 39428368819
+          run-id: 44066868338
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: incoming
       - name: Prepare public release assets and checksum
@@ -273,23 +272,23 @@ jobs:
           mkdir -p release-assets
           apk="$(find incoming -type f -name '*.apk' -print -quit)"
           test -n "$apk"
-          cp "$apk" release-assets/AzadLink-v0.9.1.apk
-          (cd release-assets && sha256sum AzadLink-v0.9.1.apk > SHA256SUMS.txt)
+          cp "$apk" release-assets/AzadLink-v0.9.2.apk
+          (cd release-assets && sha256sum AzadLink-v0.9.2.apk > SHA256SUMS.txt)
           ls -lh release-assets
       - name: Publish signed APK to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v0.9.1
+          tag_name: v0.9.2
           target_commitish: ${{ github.sha }}
-          name: AzadLink v0.9.1
+          name: AzadLink v0.9.2
           body: |
-            AzadLink v0.9.1 — signed Android APK.
+            AzadLink v0.9.2 — signed Android APK.
 
-            This release reuses the signed APK from successful CI run 39428368819. The Android source is unchanged from that build; this publication updates release availability and includes a SHA-256 checksum.
+            This release introduces the modern minimal Persian-first interface, Home / Servers / Protocols / Settings navigation, server selection, and refreshed profile cards. Existing VPN engine integrations and saved-profile handling are retained.
 
-            Device-level testing is still required. A successful APK build alone does not guarantee every protocol or network will work.
+            CI unit tests and APK assembly passed. Real-device tunnel and network behavior still require on-device verification.
           files: |
-            release-assets/AzadLink-v0.9.1.apk
+            release-assets/AzadLink-v0.9.2.apk
             release-assets/SHA256SUMS.txt
           generate_release_notes: true
           fail_on_unmatched_files: true
