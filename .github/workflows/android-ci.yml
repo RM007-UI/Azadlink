@@ -178,6 +178,7 @@ jobs:
           AZADLINK_STORE_PASSWORD: ${{ secrets.AZADLINK_STORE_PASSWORD }}
           AZADLINK_KEY_ALIAS: ${{ secrets.AZADLINK_KEY_ALIAS }}
           AZADLINK_KEY_PASSWORD: ${{ secrets.AZADLINK_KEY_PASSWORD }}
+          AZADLINK_PRERELEASE_REQUEST: ${{ github.event.head_commit.message == 'Publish AzadLink v0.11.5 prerelease' }}
         run: |
           set -euo pipefail
           present=0
@@ -185,6 +186,10 @@ jobs:
             if [[ -n "${!name:-}" ]]; then present=$((present + 1)); fi
           done
           if [[ "$present" == "0" ]]; then
+            if [[ "$GITHUB_REF" == refs/tags/v* || "$AZADLINK_PRERELEASE_REQUEST" == "true" ]]; then
+              echo "::error::A pre-release requires the persistent signing keystore secrets."
+              exit 1
+            fi
             echo "enabled=false" >> "$GITHUB_OUTPUT"
             echo "No release-signing secrets found; publishing the debug artifact only."
           elif [[ "$present" == "4" ]]; then
@@ -206,7 +211,7 @@ jobs:
           set -euo pipefail
           for name in AZADLINK_KEYSTORE_BASE64 AZADLINK_STORE_PASSWORD AZADLINK_KEY_ALIAS AZADLINK_KEY_PASSWORD; do
             if [[ -z "${!name:-}" ]]; then
-              echo "::error::Missing GitHub Actions secret: $name. Configure the stable release keystore before tagging a release."
+              echo "::error::Missing GitHub Actions secret: $name. Configure the release keystore before tagging a release."
               exit 1
             fi
           done
@@ -216,6 +221,23 @@ jobs:
           echo "AZADLINK_KEYSTORE_PATH=$keystore" >> "$GITHUB_ENV"
           export AZADLINK_KEYSTORE_PATH="$keystore"
           gradle -PaetherAbi=arm64-v8a assembleRelease
+      - name: Verify release APK ABI and required Aether binary
+        if: github.event_name != 'pull_request' && steps.signing.outputs.enabled == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk="app/build/outputs/apk/release/app-release.apk"
+          test -s "$apk"
+          entries="$(unzip -Z1 "$apk")"
+          grep -Fxq 'lib/arm64-v8a/libaether.so' <<< "$entries" || {
+            echo "::error::Release APK is missing lib/arm64-v8a/libaether.so"
+            exit 1
+          }
+          if grep -Eq '^lib/(armeabi-v7a|x86|x86_64)/' <<< "$entries"; then
+            echo "::error::Release APK contains an ABI unsupported by the bundled native engines"
+            exit 1
+          fi
+          echo "Release APK contains the Aether executable for arm64-v8a and no unsupported ABI libraries."
       - name: Upload signed APK as workflow artifact
         if: github.event_name != 'pull_request' && steps.signing.outputs.enabled == 'true'
         uses: actions/upload-artifact@v4
@@ -223,21 +245,32 @@ jobs:
           name: azadlink-release-apk
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
-      # One-time main-branch publishing is triggered by a commit message containing [publish-release].
       - name: Publish signed APK to GitHub Release
-        if: github.event_name != 'pull_request' && startsWith(github.ref, 'refs/tags/v') && steps.signing.outputs.enabled == 'true'
+        if: >-
+          github.event_name != 'pull_request' &&
+          steps.signing.outputs.enabled == 'true' &&
+          (
+            startsWith(github.ref, 'refs/tags/v') ||
+            (
+              github.ref == 'refs/heads/main' &&
+              github.event_name == 'push' &&
+              contains(github.event.head_commit.message, 'Publish AzadLink v0.11.6 stable')
+            )
+          )
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'v0.11.6' }}
           target_commitish: ${{ github.sha }}
-          name: AzadLink ${{ github.ref_name }}
+          prerelease: ${{ startsWith(github.ref, 'refs/tags/v') && contains(github.ref_name, '-') }}
+          name: AzadLink ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'v0.11.6' }}${{ (startsWith(github.ref, 'refs/tags/v') && contains(github.ref_name, '-')) && ' · Pre-release' || ' · Stable' }}
           body: |
-            AzadLink ${{ github.ref_name }} — signed Android APK.
+            AzadLink v0.11.6 — signed Android APK.
 
-            This release includes the modern minimal Persian-first interface, server profile management, and the existing Aether/Psiphon/Xray/DNS engine integrations. A successful build does not guarantee every protocol works on every network; verify tunnel startup and real traffic on-device.
+            This release adds the modern minimal Persian-first interface with Home, Servers, Protocols and Settings sections, while preserving the v0.11.5 connection state, timer, protocol selection and MASQUE → Psiphon chain behavior.
+
+            The release build runs regression tests for protocol parsing, WireGuard profile parsing, Xray config generation, reconnect backoff and Aether fallback policy. Native Aether, Xray, Psiphon and DNS engines are packaged for arm64-v8a. Real device and network behavior still requires testing on the target phone.
           files: app/build/outputs/apk/release/app-release.apk
           generate_release_notes: true
-          fail_on_unmatched_files: true
       - name: Publish build summary
         if: always()
         run: |
@@ -245,50 +278,6 @@ jobs:
             echo '### AzadLink build'
             echo '- The pinned Oblivion/Aether and hev-socks5-tunnel source trees are checked out recursively and the upstream Aether Android library is included as a Gradle module.'
             echo '- Native Aether and the TUN bridge are built through the upstream Android library; app-level service adapter and live VPN traffic routing still require integration and device verification.'
-            echo '- If release-signing secrets are configured, non-PR branch builds publish a signed APK as an Actions artifact; version tags or a main-branch commit explicitly marked [publish-release] attach it to a GitHub Release.'
+            echo '- If release-signing secrets are configured, non-PR branch builds also publish a signed APK as an Actions artifact; version tags additionally attach it to a GitHub Release.'
             echo '- A successful APK build does not by itself mean the VPN tunnel works.'
           } >> "$GITHUB_STEP_SUMMARY"
-
-  # Publish only after the main-branch build and signed APK artifact succeed.
-  publish-prebuilt-release:
-    if: github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[publish-release]')
-    runs-on: ubuntu-latest
-    permissions:
-      actions: read
-      contents: write
-    steps:
-      - name: Download signed APK from the verified successful CI run 44066868338
-        uses: actions/download-artifact@v4
-        with:
-          name: azadlink-release-apk
-          repository: ${{ github.repository }}
-          run-id: 44066868338
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          path: incoming
-      - name: Prepare public release assets and checksum
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p release-assets
-          apk="$(find incoming -type f -name '*.apk' -print -quit)"
-          test -n "$apk"
-          cp "$apk" release-assets/AzadLink-v0.9.2.apk
-          (cd release-assets && sha256sum AzadLink-v0.9.2.apk > SHA256SUMS.txt)
-          ls -lh release-assets
-      - name: Publish signed APK to GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v0.9.2
-          target_commitish: ${{ github.sha }}
-          name: AzadLink v0.9.2
-          body: |
-            AzadLink v0.9.2 — signed Android APK.
-
-            This release introduces the modern minimal Persian-first interface, Home / Servers / Protocols / Settings navigation, server selection, and refreshed profile cards. Existing VPN engine integrations and saved-profile handling are retained.
-
-            CI unit tests and APK assembly passed. Real-device tunnel and network behavior still require on-device verification.
-          files: |
-            release-assets/AzadLink-v0.9.2.apk
-            release-assets/SHA256SUMS.txt
-          generate_release_notes: true
-          fail_on_unmatched_files: true

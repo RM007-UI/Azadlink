@@ -76,9 +76,21 @@ object PsiphonAutoConnector {
             else "در حال راه‌اندازی Psiphon با موقعیت ${countryCode.ifBlank { "سریع‌ترین/خودکار" }}…")
 
             var sawConnecting = false
+            val attemptFinished = AtomicInteger(0)
             lateinit var listener: (TunnelSnapshot) -> Unit
+            lateinit var watchdog: Runnable
+
+            fun finishFailure(message: String) {
+                if (generation.get() != run || !attemptFinished.compareAndSet(0, 1)) return
+                mainHandler.removeCallbacks(watchdog)
+                TunnelBus.removeStatusListener(listener)
+                AetherVpnService.stop(app)
+                onStatusMain(onStatus, message)
+            }
+
             listener = { snapshot ->
                 if (generation.get() != run) {
+                    mainHandler.removeCallbacks(watchdog)
                     TunnelBus.removeStatusListener(listener)
                 } else {
                     if (snapshot.stage == TunnelStage.CONNECTING || snapshot.stage == TunnelStage.VALIDATING) {
@@ -86,24 +98,38 @@ object PsiphonAutoConnector {
                     }
                     if (sawConnecting) when (snapshot.stage) {
                         TunnelStage.CONNECTED -> {
-                            TunnelBus.removeStatusListener(listener)
-                            onStatusMain(onStatus, if (chainOverMasque)
-                                "متصل: MASQUE → Psiphon؛ وضعیت تونل تأیید شد."
-                            else "Psiphon متصل شد؛ وضعیت تونل تأیید شد.")
+                            if (attemptFinished.compareAndSet(0, 1)) {
+                                mainHandler.removeCallbacks(watchdog)
+                                TunnelBus.removeStatusListener(listener)
+                                onStatusMain(onStatus, if (chainOverMasque)
+                                    "متصل: MASQUE → Psiphon؛ رابط VPN برقرار شد."
+                                else "Psiphon متصل شد؛ رابط VPN برقرار شد.")
+                            }
                         }
                         TunnelStage.FAILED -> {
-                            TunnelBus.removeStatusListener(listener)
-                            onStatusMain(onStatus, "اتصال ${if (chainOverMasque) "MASQUE → Psiphon" else "Psiphon"} ناموفق شد؛ گزارش موتور را بررسی کن.")
+                            val detail = snapshot.message?.trim()?.takeIf { it.isNotEmpty() }
+                                ?.let { ": $it" }.orEmpty()
+                            finishFailure("اتصال ${if (chainOverMasque) "MASQUE → Psiphon" else "Psiphon"} ناموفق شد$detail")
                         }
                         else -> Unit
                     }
                 }
             }
+            watchdog = Runnable {
+                val timeoutSeconds = if (chainOverMasque) 315 else 195
+                finishFailure(
+                    "${if (chainOverMasque) "MASQUE → Psiphon" else "Psiphon"} در $timeoutSeconds ثانیه آماده نشد؛ گزارش موتور را بررسی کن. ممکن است مسیر سرور در شبکهٔ فعلی در دسترس نباشد."
+                )
+            }
             TunnelBus.addStatusListener(listener)
             try {
                 AetherVpnService.start(app, TunnelConfig.fromMap(settings, args))
+                mainHandler.postDelayed(watchdog, if (chainOverMasque) 315_000L else 195_000L)
             } catch (error: Throwable) {
-                TunnelBus.removeStatusListener(listener)
+                if (attemptFinished.compareAndSet(0, 1)) {
+                    mainHandler.removeCallbacks(watchdog)
+                    TunnelBus.removeStatusListener(listener)
+                }
                 throw error
             }
         } catch (error: Throwable) {

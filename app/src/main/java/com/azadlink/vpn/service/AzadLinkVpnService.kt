@@ -14,6 +14,7 @@ import go.Seq
 import libv2ray.CoreCallbackHandler
 import libv2ray.CoreController
 import libv2ray.Libv2ray
+import com.azadlink.vpn.R
 import com.azadlink.vpn.core.Protocol
 import com.azadlink.vpn.runtime.CoreConfigBuilder
 import com.azadlink.vpn.core.ProtocolProfile
@@ -177,7 +178,10 @@ class AzadLinkVpnService : VpnService(), CoreCallbackHandler {
                 connection.disconnect()
             }
             if (code !in 200..399) throw IllegalStateException("آزمون اینترنت پاسخ HTTP $code داد")
-            publishStatus(if (proxyOnly) "پراکسی محلی فعال و آزموده شد · SOCKS5 127.0.0.1:10808" else "متصل · عبور ترافیک از تونل تأیید شد")
+            publishStatus(if (proxyOnly)
+                "پراکسی محلی فعال و آزموده شد · SOCKS5 127.0.0.1:10808"
+            else
+                "موتور و خروجی پراکسی آزموده شدند؛ وضعیت VPN فعال است")
         } catch (error: Throwable) {
             stopTunnel("اتصال تونل تأیید نشد: ${error.message ?: "آزمون اینترنت ناموفق بود"}")
         }
@@ -213,7 +217,7 @@ class AzadLinkVpnService : VpnService(), CoreCallbackHandler {
             Notification.Builder(this)
         }
         return builder
-            .setSmallIcon(android.R.drawable.stat_sys_warning)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("AzadLink · $currentLabel")
             .setContentText(message)
             .setOngoing(true)

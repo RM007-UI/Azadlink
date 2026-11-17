@@ -2,19 +2,29 @@
 
 AzadLink is an experimental Android VPN client integrating Aether/MASQUE, Psiphon, Xray share-link protocols, and DNS tunnel engines.
 
-## Current version: 0.9.2
+## Current version: 0.11.6
 
 
 
-- Four bottom navigation sections: Home, server profiles, engines/protocols, and settings.
-- Modern minimal Persian-first interface with quick connect, server picker, and light blue/purple visual system.
+- Modern minimal Persian-first interface with Home, Servers, Protocols and Settings sections.
+- Home screen includes live connection state, protocol selection and connection timer.
+- Preserves the v0.11.5 engine integrations, DNS-to-TUN service, proxy controls, split tunneling and diagnostics.
 - MASQUE advanced options: HTTP/2 vs engine default, obfuscation profile, IP family, and TLS SNI.
+- Better automatic MASQUE gateway selection: Balanced scan compares verified gateways on first connect; when it finds no gateway, automatic fallback expands to a full-subnet Thorough scan over HTTP/2 before trying HTTP/3. Aether's quick-reconnect path reuses its persisted last-working endpoint on later connects. Concurrent reconnects stop the previous session, and stale timeout callbacks cannot stop a newer session or leave duplicate Aether cores alive.
+- This release packages only `arm64-v8a`, because the Aether executable and the bundled tunnel engines are built for 64-bit ARM. Older 32-bit-only Android systems are not supported by this build.
 - App-based split tunneling: route all apps, exclude selected apps, or route only selected apps.
 - Launcher icon and release-signing configuration.
-- Proxy-only mode is implemented for Aether/Psiphon and Xray-based server protocols; apps must be configured to use the local SOCKS endpoint. DNS tunnel engines still need separate VPN/proxy integration.
+- Proxy-only mode is implemented for Aether/Psiphon and Xray-based server protocols; apps must be configured to use the local SOCKS endpoint. DNS tunnel engines use the built-in SOCKS5-to-TUN bridge and require valid server-side configuration.
 - Psiphon is built from the pinned Aether-compatible fork in CI. Device-level startup and live traffic still need verification.
 
-A successful CI build does not prove that every protocol works on every network. Check the Actions workflow and test on-device before treating a build as stable.
+Regression tests cover share-link parsing, WireGuard block parsing, Xray configuration generation, and reconnect backoff. A successful CI build still does not prove that every protocol works on every network. Check the Actions workflow and test on-device before treating a build as stable.
+
+## v0.11.5 fix notes
+
+- Automatic MASQUE now tries HTTP/3 first and falls back to HTTP/2 for networks that block QUIC; the automatic SNI matches the Cloudflare CONNECT authority to avoid virtual-host mismatches.
+- Automatic fallback still widens the scan if the first carrier cannot establish a verified tunnel.
+- New connection attempts stop the previous Aether service session and serialize start/stop operations to prevent stale attempts from leaving duplicate cores behind.
+- Added unit tests for the scan fallback policy. A clean CI build cannot guarantee that a specific carrier/network allows MASQUE; device-side verification is still required after installing this build.
 
 ## Stable APK signing
 
@@ -32,3 +42,10 @@ The regular CI build also publishes an arm64 debug APK as a separate Actions art
 ## Build
 
 The Android CI workflow checks out the pinned submodule, builds the native engines, runs unit tests, and assembles the debug APK. Native VPN routing, proxy-only behavior, and protocol connectivity require separate device testing.
+
+
+## v0.11.6 interface refresh
+
+- Reorganized the main interface into four compact sections with a light blue/purple visual system.
+- Preserved v0.11.5 connection state handling, elapsed timer, selected protocol and MASQUE → Psiphon chain selection.
+- Retained the dedicated DNS VPN service and regression tests for protocol parsing, reconnect backoff, fallback policy and Xray configuration generation.
