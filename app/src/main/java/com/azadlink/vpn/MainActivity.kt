@@ -1235,7 +1235,7 @@ class MainActivity : Activity() {
             about.addView(gap(6))
             about.addView(label("یک رابط یکپارچه برای مدیریت چند موتور و پروتکل اتصال.", 12, muted))
             about.addView(gap(5))
-            about.addView(label("نسخهٔ برنامه: 0.9.1", 11, muted))
+            about.addView(label("نسخهٔ برنامه: 0.9.2", 11, muted))
             page.addView(about)
         }
 
