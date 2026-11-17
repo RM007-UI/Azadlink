@@ -228,13 +228,13 @@ jobs:
         if: github.event_name != 'pull_request' && startsWith(github.ref, 'refs/tags/v') && steps.signing.outputs.enabled == 'true'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'v0.9.1' }}
+          tag_name: ${{ github.ref_name }}
           target_commitish: ${{ github.sha }}
-          name: AzadLink v0.9.1
+          name: AzadLink ${{ github.ref_name }}
           body: |
-            AzadLink v0.9.1 — signed Android APK.
+            AzadLink ${{ github.ref_name }} — signed Android APK.
 
-            This build includes the current Aether/Psiphon integration and the build-time compatibility check for the Psiphon protocol reported on-device. Device/network behavior can vary; test tunnel startup and traffic on your own connection.
+            This release includes the modern minimal Persian-first interface, server profile management, and the existing Aether/Psiphon/Xray/DNS engine integrations. A successful build does not guarantee every protocol works on every network; verify tunnel startup and real traffic on-device.
           files: app/build/outputs/apk/release/app-release.apk
           generate_release_notes: true
           fail_on_unmatched_files: true
