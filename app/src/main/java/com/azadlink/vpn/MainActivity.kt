@@ -1118,7 +1118,7 @@ class MainActivity : Activity() {
                 navigateToTab(2)
             }
             actionCard(page, "⚙", "تنظیمات اتصال", "مسیریابی برنامه‌ها و تنظیمات پیشرفته", green) {
-                selectTab(3)
+                navigateToTab(3)
             }
             page.addView(gap(8))
             val note = label(
