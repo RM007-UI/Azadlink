@@ -21,23 +21,23 @@ object EngineRegistry {
             "https://github.com/Psiphon-Labs/psiphon-tunnel-core"
         ),
         EngineFamily.WIREGUARD to EngineDescriptor(
-            EngineFamily.WIREGUARD, "WireGuard outbound", EngineReadiness.NEEDS_INTEGRATION,
-            "تبدیل خودکار پروفایل WireGuard به outbound در این نسخه پیاده‌سازی نشده است.",
+            EngineFamily.WIREGUARD, "WireGuard outbound", EngineReadiness.CORE_RUNTIME_REQUIRED,
+            "پروفایل استاندارد WireGuard به outbound هستهٔ Xray تبدیل می‌شود؛ اتصال واقعی به سرور باید روی دستگاه بررسی شود.",
             "https://github.com/XTLS/Xray-core"
         ),
         EngineFamily.MASTER_DNS to EngineDescriptor(
             EngineFamily.MASTER_DNS, "MasterDnsVPN Go client", EngineReadiness.NEEDS_SERVER_CONFIG,
-            "به پروفایل/سرور اختصاصی و اتصال موتور به پل VPN نیاز دارد؛ صرف شناسایی پروفایل به معنی اتصال نیست.",
+            "به پروفایل و سرور معتبر نیاز دارد؛ سرویس داخلی از پل SOCKS5 به TUN استفاده می‌کند و اتصال به سرور باید بررسی شود.",
             "https://github.com/masterking32/MasterDnsVPN"
         ),
         EngineFamily.STORM_DNS to EngineDescriptor(
             EngineFamily.STORM_DNS, "StormDNS Go client", EngineReadiness.NEEDS_SERVER_CONFIG,
-            "به سرور و DNS zone اختصاصی و اتصال موتور به پل VPN نیاز دارد.",
+            "به سرور و DNS zone اختصاصی نیاز دارد؛ سرویس داخلی از پل SOCKS5 به TUN استفاده می‌کند.",
             "https://github.com/nullroute1970/StormDNS"
         ),
         EngineFamily.DNSTT to EngineDescriptor(
             EngineFamily.DNSTT, "DNSTT Go client", EngineReadiness.NEEDS_SERVER_CONFIG,
-            "به دامنه، کلید و سرور راه‌دور نیاز دارد؛ پل ترافیک VPN هنوز باید یکپارچه شود.",
+            "به دامنه، کلید عمومی، resolver و سرور راه‌دور نیاز دارد؛ پل SOCKS5 به TUN در برنامه قرار دارد.",
             "https://github.com/mahsanet/dnstt"
         )
     )
