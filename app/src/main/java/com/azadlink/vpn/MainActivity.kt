@@ -1706,7 +1706,7 @@ class MainActivity : Activity() {
                 setPadding(dp(16), dp(22), dp(16), dp(22))
                 background = rounded(Color.WHITE, 18)
             }
-            empty.addView(text("هنوز پروفایلی اضافه نشده", 14, Color.WHITE, true))
+            empty.addView(text("هنوز پروفایلی اضافه نشده", 14, Color.rgb(25, 32, 50), true))
             empty.addView(text("لینک سرور را بالا وارد کن.", 12, Color.rgb(112, 122, 145)))
             profileList.addView(empty)
             return
@@ -1740,7 +1740,7 @@ class MainActivity : Activity() {
                 orientation = LinearLayout.VERTICAL
                 setPadding(dp(10), 0, 0, 0)
             }
-            copy.addView(text(profile.label, 15, Color.WHITE, true))
+            copy.addView(text(profile.label, 15, Color.rgb(25, 32, 50), true))
             copy.addView(text(profile.protocol.displayName + " · پروفایل ذخیره‌شده", 11, Color.rgb(112, 122, 145)))
             top.addView(mark)
             top.addView(copy, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
