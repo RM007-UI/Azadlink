@@ -254,7 +254,7 @@ jobs:
             (
               github.ref == 'refs/heads/main' &&
               github.event_name == 'push' &&
-              github.event.head_commit.message == 'Publish AzadLink v0.11.6 stable'
+              contains(github.event.head_commit.message, 'Publish AzadLink v0.11.6 stable')
             )
           )
         uses: softprops/action-gh-release@v2
