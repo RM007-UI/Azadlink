@@ -1030,6 +1030,7 @@ class MainActivity : Activity() {
         }
         scroll.addView(content)
         val pages = mutableListOf<LinearLayout>()
+        var navigateToTab: (Int) -> Unit = {}
         fun addPage(build: (LinearLayout) -> Unit) {
             val page = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
@@ -1111,10 +1112,10 @@ class MainActivity : Activity() {
 
             section(page, "دسترسی سریع", "بخش‌های پرکاربرد AzadLink")
             actionCard(page, "⌘", "سرورها و پروفایل‌ها", "افزودن لینک و مدیریت کانفیگ‌های ذخیره‌شده", blue) {
-                selectTab(1)
+                navigateToTab(1)
             }
             actionCard(page, "◈", "موتورها و پروتکل‌ها", "MASQUE، Psiphon، DNS و پروتکل‌های Xray", purple) {
-                selectTab(2)
+                navigateToTab(2)
             }
             actionCard(page, "⚙", "تنظیمات اتصال", "مسیریابی برنامه‌ها و تنظیمات پیشرفته", green) {
                 selectTab(3)
@@ -1270,6 +1271,7 @@ class MainActivity : Activity() {
             }
             scroll.scrollTo(0, 0)
         }
+        navigateToTab = { tabIndex -> selectTab(tabIndex) }
         navItems.forEachIndexed { index, item ->
             val tab = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
@@ -1702,10 +1704,10 @@ class MainActivity : Activity() {
                 orientation = LinearLayout.VERTICAL
                 gravity = Gravity.CENTER
                 setPadding(dp(16), dp(22), dp(16), dp(22))
-                background = rounded(Color.rgb(17, 23, 38), 18)
+                background = rounded(Color.WHITE, 18)
             }
             empty.addView(text("هنوز پروفایلی اضافه نشده", 14, Color.WHITE, true))
-            empty.addView(text("لینک سرور را بالا وارد کن.", 12, Color.rgb(152, 166, 192)))
+            empty.addView(text("لینک سرور را بالا وارد کن.", 12, Color.rgb(112, 122, 145)))
             profileList.addView(empty)
             return
         }
@@ -1715,9 +1717,9 @@ class MainActivity : Activity() {
                 orientation = LinearLayout.VERTICAL
                 setPadding(dp(13), dp(12), dp(13), dp(12))
                 background = GradientDrawable().apply {
-                    setColor(Color.rgb(20, 28, 45))
+                    setColor(Color.WHITE)
                     cornerRadius = dp(18).toFloat()
-                    setStroke(dp(1), Color.rgb(43, 54, 76))
+                    setStroke(dp(1), Color.rgb(229, 233, 243))
                 }
                 elevation = dp(1).toFloat()
             }
@@ -1730,8 +1732,8 @@ class MainActivity : Activity() {
                 textSize = 16f
                 setTypeface(typeface, Typeface.BOLD)
                 gravity = Gravity.CENTER
-                setTextColor(Color.WHITE)
-                background = rounded(Color.rgb(75, 64, 134), 13)
+                setTextColor(Color.rgb(25, 32, 50))
+                background = rounded(Color.rgb(239, 242, 255), 13)
                 layoutParams = LinearLayout.LayoutParams(dp(41), dp(41))
             }
             val copy = LinearLayout(this).apply {
@@ -1739,15 +1741,15 @@ class MainActivity : Activity() {
                 setPadding(dp(10), 0, 0, 0)
             }
             copy.addView(text(profile.label, 15, Color.WHITE, true))
-            copy.addView(text(profile.protocol.displayName + " · پروفایل ذخیره‌شده", 11, Color.rgb(135, 218, 184)))
+            copy.addView(text(profile.protocol.displayName + " · پروفایل ذخیره‌شده", 11, Color.rgb(112, 122, 145)))
             top.addView(mark)
             top.addView(copy, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
             val delete = TextView(this).apply {
                 text = "×"
                 textSize = 25f
                 gravity = Gravity.CENTER
-                setTextColor(Color.rgb(232, 151, 164))
-                background = rounded(Color.rgb(55, 35, 50), 12)
+                setTextColor(Color.rgb(191, 67, 83))
+                background = rounded(Color.rgb(255, 239, 241), 12)
                 layoutParams = LinearLayout.LayoutParams(dp(39), dp(39))
                 isClickable = true
                 setOnClickListener {
@@ -1769,7 +1771,7 @@ class MainActivity : Activity() {
             card.addView(text("موتور: " + engine.name, 11, Color.rgb(152, 166, 192)))
             card.addView(space(10))
             val connectButton = button("اتصال با این پروفایل") { requestConnect(profile) }.apply {
-                background = rounded(Color.rgb(81, 65, 164), 13)
+                background = rounded(Color.rgb(70, 105, 235), 13)
                 backgroundTintList = null
                 minHeight = dp(44)
             }
